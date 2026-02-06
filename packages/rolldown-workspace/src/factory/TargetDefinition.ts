@@ -2,18 +2,16 @@ import type { OutputOptions, Plugin } from "rolldown";
 
 import { Builder } from "~/build/Builder";
 
-import type { BuildContext, BuildTarget, LogSuppression } from "./common";
+import type { BuildContext, BuildTarget, InputConfig, LogSuppression } from "./common";
 import { createEntity, type AnyEntity, type Entity, type NameOf } from "./Entity";
 import { createEntityContainer, type EntityContainer, type EntityMap } from "./EntityContainer";
-import type { OutputConfig } from "./OutputDefinition";
 import { definePipeline, type AnyPipelineDeclaration, type PipelineDefinition } from "./PipelineDefinition";
 import type { AnyPluginDeclaration } from "./PluginDefinition";
 
 export type TargetDefinition<
 	TName extends string,
-	TConfig extends OutputConfig,
 	TPipelines extends EntityMap<AnyPipelineDeclaration>,
-> = Entity<TName, TConfig, {
+> = Entity<TName, InputConfig, {
 	readonly pipelines: TPipelines;
 
 	/** @internal */
@@ -26,40 +24,35 @@ export type TargetDefinition<
 	entry(
 		unit: string,
 		entryPath: string,
-	): Target<TName, TConfig, TPipelines>;
+	): Target<TName, TPipelines>;
 
 	pipeline<TPipelineName extends string, TPipeline extends AnyPipelineDeclaration>(
 		name: TPipelineName,
-		block: (pipeline: PipelineDefinition<TPipelineName, TConfig, {}, {}>) => TPipeline,
-	): TargetDefinition<TName, TConfig, TPipelines & { [K in NameOf<TPipeline>]: TPipeline }>;
+		block: (pipeline: PipelineDefinition<TPipelineName, {}, {}>) => TPipeline,
+	): TargetDefinition<TName, TPipelines & { [K in NameOf<TPipeline>]: TPipeline }>;
 
 	build(
-		block: (target: Target<TName, TConfig, TPipelines>) => void,
+		block: (target: Target<TName, TPipelines>, context: BuildContext) => void,
 	): void;
 }>;
 
+export type AnyTargetDeclaration = TargetDefinition<any, any>;
+
 export type Target<
 	TName extends string,
-	TConfig extends OutputConfig,
 	TPipelines extends EntityMap<AnyPipelineDeclaration>,
-> = Omit<TargetDefinition<TName, TConfig, TPipelines>, "pipeline" | "override" | "build"> & {
+> = Omit<TargetDefinition<TName, TPipelines>, "pipeline" | "override" | "build"> & {
 	entry(
 		unit: string,
 		entryPath: string,
-	): Target<TName, TConfig, TPipelines>;
+	): Target<TName, TPipelines>;
 };
 
-export type AnyTargetDeclaration = (
-	TargetDefinition<any, any, any>
-);
-
-export type AnyTarget = (
-	Target<any, any, any>
-);
+export type AnyTarget = Target<any, any>;
 
 export function defineTarget<TName extends string, TTarget extends AnyTargetDeclaration>(
 	name: TName,
-	block: (target: TargetDefinition<TName, OutputConfig, {}>) => TTarget,
+	block: (target: TargetDefinition<TName, {}>) => TTarget,
 ): TTarget {
 	const pipelineContainer = createEntityContainer<AnyPipelineDeclaration>("Pipeline");
 	return block(
@@ -119,25 +112,18 @@ function onPipeline(
 	};
 }
 
-const DEFAULT_CONFIG: OutputOptions = {
-	dir: "./dist",
-	entryFileNames: "[name].js",
-	format: "es",
-	sourcemap: true,
-};
-
 function onBuild(
 	this: AnyTargetDeclaration,
-	block: (target: AnyTarget) => void,
+	block: (target: AnyTarget, context: BuildContext) => void,
 ): void {
 	const target = this.finalize();
 	Builder.addBuildTask(async context => {
-		block(target);
+		block(target, context);
 		if (!hasEntries(target) || await isDisabled(target, context)) {
 			return [];
 		}
 
-		const targetConfig = await target.getConfig(DEFAULT_CONFIG, context);
+		const targetConfig = await target.getConfig({}, context);
 		return target.pipelineContainer.collect<BuildTarget>(async pipeline => {
 			if (await isDisabled(pipeline, context)) {
 				return null;
@@ -151,7 +137,7 @@ function onBuild(
 					return null;
 				}
 
-				const outputConfig = await output.getConfig(pipelineConfig, context);
+				const outputConfig = await output.getConfig({}, context);
 				const outputPlugins = await collectPlugins(output.pluginContainer, context, suppressions);
 				return {
 					...outputConfig,
@@ -167,6 +153,7 @@ function onBuild(
 				name: `${target.name} · ${pipeline.name}`,
 				outputs: pipelineOutputs,
 				input: {
+					...pipelineConfig,
 					input: target.entries,
 					plugins: pipelinePlugins,
 					onLog(level, log) {

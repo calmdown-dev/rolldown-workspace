@@ -13,14 +13,14 @@ const PLUGIN_NAME = "Delete";
 /**
  * @typedef {Object} DeleteOptions
  * @property {boolean} [dryRun=false] - If true, only logs actions without executing
- * @property {DeleteTarget[]} targets - List of delete operations
+ * @property {(string|DeleteTarget)|(string|DeleteTarget)[]} targets - List of delete operations
  */
 
 /**
  * @param {DeleteOptions} options
  */
 export default function DeletePlugin(options) {
-	const targets = options?.targets ?? [];
+	const targets = toArray(options?.targets ?? []).map(it => typeof it === "string" ? { include: it } : it);
 
 	const exec = (context, message, block) => {
 		if (options?.dryRun) {

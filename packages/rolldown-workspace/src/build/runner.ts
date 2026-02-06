@@ -48,14 +48,14 @@ const command = buildCommand()
 export async function build(options?: BuildOptions) {
 	const totalStartTime = Date.now();
 	const reporter = new Reporter(process.stdout);
-	let isWatch = false;
+	let isWatching = false;
 	let isDebug = false;
 
 	try {
 		const argv = options?.argv ?? process.argv.slice(2);
 		const cwd = options?.cwd ?? process.cwd();
 		const cmd = parseArgs(command, argv);
-		isWatch = options?.watch ?? cmd.opts.watch;
+		isWatching = options?.watch ?? cmd.opts.watch;
 		isDebug = options?.debug ?? cmd.opts.debug;
 
 		// setup reporter
@@ -101,7 +101,7 @@ export async function build(options?: BuildOptions) {
 		await Dispatcher.run(packages, fs, {
 			reporter,
 			env,
-			isWatch,
+			isWatching,
 			isDebug,
 		});
 	}
@@ -112,7 +112,7 @@ export async function build(options?: BuildOptions) {
 		reporter.finish();
 		reporter.println();
 
-		if (!isWatch) {
+		if (!isWatching) {
 			const totalTimeTaken = Date.now() - totalStartTime;
 			reporter.println(`done in ${formatTime(totalTimeTaken)}`);
 		}

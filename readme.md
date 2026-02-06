@@ -1,11 +1,11 @@
 # Rolldown Workspace
 
 This monorepo hosts the `@calmdown/rolldown-workspace` utility as well as
-several Rolldown plugins:
+several Rollup/Rolldown plugins:
 
 |||
 |---|---|
 | [rolldown-workspace](./packages/rolldown-workspace/) | pipelining utility for Rolldown and Yarn workspaces |
-| [rolldown-plugin-copy](./packages/rolldown-plugin-copy/) | copy files during builds |
-| [rolldown-plugin-delete](./packages/rolldown-plugin-delete/) | delete files during builds |
-| [rolldown-plugin-text-loader](./packages/rolldown-plugin-text-loader/) | load file contents as runtime constants |
+| [rollup-plugin-copy](./packages/rollup-plugin-copy/) | copy files during builds |
+| [rollup-plugin-delete](./packages/rollup-plugin-delete/) | delete files during builds |
+| [rollup-plugin-text-loader](./packages/rollup-plugin-text-loader/) | load file contents as runtime constants |

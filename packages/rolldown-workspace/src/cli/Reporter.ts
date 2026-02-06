@@ -52,17 +52,16 @@ export class Reporter {
 
 	private readonly isFormatted: boolean = !/^(true|1)$/i.test(process.env.CI ?? "");
 	private readonly packages = new Map<Package, PackageInfo>();
-	private printTreeHandle: ReturnType<typeof setTimeout> | null = null;
+	private updateHandle: ReturnType<typeof setTimeout> | null = null;
 	private linesToClear = 0;
 	private lastLogTitle = "";
+	private isFinished = false;
 
 	public constructor(
 		private readonly output: WriteStream,
 	) {}
 
 	public log(title: string, message: string, level: LogLevel = "info") {
-		this.clearTree();
-
 		let output = "";
 		if (this.lastLogTitle !== title) {
 			output = `${EOL}${this.format(title, ANSI_BOLD)}${EOL}┌${"─".repeat(title.length - 1)}${EOL}`;
@@ -75,11 +74,7 @@ export class Reporter {
 			.join(`${EOL}| `);
 
 		output += `│ ${formatted}${EOL}`;
-		this.print(output);
-
-		if (this.isFormatted) {
-			this.printTree(true);
-		}
+		this.writeOutput(output);
 	}
 
 	public logError(title: string, ex: Error) {
@@ -95,7 +90,7 @@ export class Reporter {
 		info.status = status;
 		info.message = message;
 
-		this.updateTree();
+		this.scheduleUpdate();
 	}
 
 	public packageBuildStarted(pkg: Package) {
@@ -103,7 +98,7 @@ export class Reporter {
 		info.status = "BUSY";
 		info.buildStartTime = Date.now();
 
-		this.updateTree();
+		this.scheduleUpdate();
 	}
 
 	public packageBuildSucceeded(pkg: Package) {
@@ -111,7 +106,7 @@ export class Reporter {
 		info.status = "PASS";
 		info.buildEndTime = Date.now();
 
-		this.updateTree();
+		this.scheduleUpdate();
 	}
 
 	public packageBuildFailed(pkg: Package) {
@@ -119,26 +114,17 @@ export class Reporter {
 		info.status = "FAIL";
 		info.buildEndTime = Date.now();
 
-		this.updateTree();
+		this.scheduleUpdate();
 	}
 
 	public finish() {
-		if (this.isFormatted && this.printTreeHandle !== null) {
-			clearTimeout(this.printTreeHandle);
-			this.printTreeHandle = null;
-			this.printTree(true);
-		}
-		else if (!this.isFormatted) {
-			this.printTree(true);
-		}
+		this.writeOutput("", true);
+		this.linesToClear = 0;
+		this.isFinished = true;
 	}
 
-	public print(message: string) {
-		this.output.write(message);
-	}
-
-	public println(message: string = "") {
-		this.output.write(message + EOL);
+	public println(text = "") {
+		this.writeOutput(text + EOL);
 	}
 
 
@@ -160,49 +146,54 @@ export class Reporter {
 		return info;
 	}
 
-	private updateTree() {
-		if (this.isFormatted) {
-			this.printTree();
-		}
+	private scheduleUpdate() {
+		this.updateHandle ??= setTimeout(() => {
+			this.updateHandle = null;
+			this.writeOutput("");
+		}, 50);
 	}
 
-	private clearTree() {
-		if (this.isFormatted && this.linesToClear > 0) {
-			// move cursor up {linesToClear} lines and clear down
-			this.print(`\u001b[${this.linesToClear}A\r\u001b[0J`);
+	private writeOutput(text: string, includeTree = this.isFormatted) {
+		let seq = text;
+		if (this.linesToClear > 0) {
+			// go up n-lines and clear down
+			seq = `\u001b[${this.linesToClear}A\r\u001b[0J${seq}`;
 			this.linesToClear = 0;
 		}
-	}
 
-	private readonly printTree = (force = false) => {
-		if (!force) {
-			this.printTreeHandle ??= setTimeout(this.printTree, 10, true);
-			return;
+		if (includeTree && !this.isFinished) {
+			const tree = this.formatTree();
+			seq += tree.output;
+			this.linesToClear = tree.lineCount;
 		}
 
-		const result = this.packages
+		this.output.write(seq);
+	}
+
+	private formatTree() {
+		const isRoot = ({ pkg }: PackageInfo) => (
+			pkg.upstreamDependents.length === 0 ||
+			pkg.upstreamDependents.every(dep => !this.packages.has(dep))
+		)
+
+		return this.packages
 			.values()
-			.filter(it => it.pkg.upstreamDependents.length === 0)
+			.filter(isRoot)
 			.reduce(
 				(acc, info) => {
-					const tmp = this.printTreeNode(info.pkg);
+					const tmp = this.formatTreeNode(info.pkg);
 					acc.lineCount += tmp.lineCount;
 					acc.output += tmp.output;
 					return acc;
 				},
 				{
-					lineCount: 0,
+					lineCount: 1,
 					output: EOL,
 				},
 			);
-
-		this.clearTree();
-		this.print(result.output);
-		this.linesToClear += result.lineCount + 1;
-		this.printTreeHandle = null;
 	}
 
-	private printTreeNode(
+	private formatTreeNode(
 		pkg: Package,
 		prefix: string = "",
 		li0: string = "",
@@ -234,7 +225,7 @@ export class Reporter {
 
 		for (; index < length; index += 1) {
 			isLast = index + 1 === length;
-			result = this.printTreeNode(
+			result = this.formatTreeNode(
 				pkg.downstreamDependencies[index],
 				prefix + li1,
 				isLast ? "╰─ " : "├─ ",

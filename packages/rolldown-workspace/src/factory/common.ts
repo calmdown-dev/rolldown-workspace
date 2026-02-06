@@ -4,6 +4,9 @@ import type { Reporter } from "~/cli";
 
 import type { Configurator } from "./Entity";
 
+export type InputConfig = Omit<InputOptions, "cwd" | "input" | "onLog" | "plugins">;
+export type OutputConfig = Omit<OutputOptions, "plugins">;
+
 /** @internal */
 export interface BuildTask {
 	(context: BuildContext): Promise<readonly BuildTarget[]>;
@@ -27,7 +30,7 @@ export interface BuildContext {
 	readonly cwd: string;
 	readonly env: Env;
 	readonly moduleName: string;
-	readonly isWatch: boolean;
+	readonly isWatching: boolean;
 	readonly isDebug: boolean;
 }
 
@@ -37,10 +40,6 @@ export enum Env {
 	Production = "prod",
 }
 
-export function isEnv(context: BuildContext, ...envs: Env[]): boolean {
-	return envs.includes(context.env);
-}
-
 export function inEnv(...envs: Env[]): Configurator<boolean> {
-	return (_, context) => isEnv(context, ...envs);
+	return (_, context) => envs.includes(context.env);
 }

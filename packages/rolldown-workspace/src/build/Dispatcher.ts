@@ -165,7 +165,7 @@ export class Dispatcher {
 		// start dispatching
 		const dispatcher = new Dispatcher(entries, call);
 		await dispatcher.build();
-		if (call.isWatch) {
+		if (call.isWatching) {
 			await dispatcher.watch();
 		}
 	}

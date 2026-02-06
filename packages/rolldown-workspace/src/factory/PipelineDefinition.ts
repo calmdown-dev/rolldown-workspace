@@ -1,14 +1,14 @@
+import type { InputConfig } from "./common";
 import { createEntity, type Entity, type NameOf } from "./Entity";
 import { createEntityContainer, type EntityContainer, type EntityMap } from "./EntityContainer";
-import { defineOutput, type AnyOutputDeclaration, type OutputConfig, type OutputDefinition } from "./OutputDefinition";
+import { defineOutput, type AnyOutputDeclaration, type OutputDefinition } from "./OutputDefinition";
 import type { AnyPluginDeclaration } from "./PluginDefinition";
 
 export type PipelineDefinition<
 	TName extends string,
-	TConfig extends OutputConfig,
 	TPlugins extends EntityMap<AnyPluginDeclaration>,
 	TOutputs extends EntityMap<AnyOutputDeclaration>,
-> = Entity<TName, TConfig, {
+> = Entity<TName, InputConfig, {
 	readonly plugins: TPlugins;
 	readonly outputs: TOutputs;
 
@@ -23,25 +23,23 @@ export type PipelineDefinition<
 
 	plugin<TPlugin extends AnyPluginDeclaration>(
 		plugin: TPlugin,
-	): PipelineDefinition<TName, TConfig, TPlugins & { [K in NameOf<TPlugin>]: TPlugin }, TOutputs>;
+	): PipelineDefinition<TName, TPlugins & { [K in NameOf<TPlugin>]: TPlugin }, TOutputs>;
 
 	output<TOutputName extends string, TOutput extends AnyOutputDeclaration>(
 		name: TOutputName,
-		block?: (output: OutputDefinition<TOutputName, TConfig, {}>) => TOutput,
-	): PipelineDefinition<TName, TConfig, TPlugins, TOutputs & { [K in NameOf<TOutput>]: TOutput }>;
+		block?: (output: OutputDefinition<TOutputName, {}>) => TOutput,
+	): PipelineDefinition<TName, TPlugins, TOutputs & { [K in NameOf<TOutput>]: TOutput }>;
 
 	suppress(
 		code: string,
-	): PipelineDefinition<TName, TConfig, TPlugins, TOutputs>;
+	): PipelineDefinition<TName, TPlugins, TOutputs>;
 }>;
 
-export type AnyPipelineDeclaration = (
-	PipelineDefinition<any, any, any, any>
-);
+export type AnyPipelineDeclaration = PipelineDefinition<any, any, any>;
 
-export function definePipeline<TName extends string, TConfig extends OutputConfig>(
+export function definePipeline<TName extends string>(
 	name: TName,
-): PipelineDefinition<TName, TConfig, {}, {}> {
+): PipelineDefinition<TName, {}, {}> {
 	const pluginContainer = createEntityContainer<AnyPluginDeclaration>("Plugin");
 	const outputContainer = createEntityContainer<AnyOutputDeclaration>("Output");
 	return createEntity(name, {
