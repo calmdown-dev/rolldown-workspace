@@ -16,7 +16,7 @@ export interface BuildTask {
 export interface BuildTarget {
 	readonly name: string;
 	readonly input: InputOptions;
-	readonly outputs: readonly OutputOptions[];
+	readonly outputs: OutputOptions[];
 }
 
 /** @internal */

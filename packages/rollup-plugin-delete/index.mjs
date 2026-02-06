@@ -5,15 +5,16 @@ const PLUGIN_NAME = "Delete";
 
 /**
  * @typedef {Object} DeleteTarget
- * @property {string|string[]} include - Glob pattern(s) of files to include
- * @property {string|string[]} [exclude] - Glob pattern(s) to exclude (optional)
- * @property {"before"|"after"} [trigger="before"] - When to run the operation (defaults to "before")
+ * @property {string|string[]} include - glob pattern(s) of files to include
+ * @property {string|string[]} [exclude] - glob pattern(s) to exclude (optional)
+ * @property {"before"|"after"} [trigger="before"] - when to run the operation (defaults to "before")
  */
 
 /**
  * @typedef {Object} DeleteOptions
- * @property {boolean} [dryRun=false] - If true, only logs actions without executing
- * @property {(string|DeleteTarget)|(string|DeleteTarget)[]} targets - List of delete operations
+ * @property {boolean} [dryRun=false] - whether to perform a dry run: only log actions without executing them
+ * @property {boolean} [runOnce=true] - when in watch mode, controls whether to only delete files on the first build
+ * @property {(string|DeleteTarget)|(string|DeleteTarget)[]} targets - list of delete operations
  */
 
 /**
@@ -75,9 +76,16 @@ export default function DeletePlugin(options) {
 	};
 
 	let cwd = undefined;
+	let isFirstBeforeRun = true;
+	let isFirstAfterRun = true;
 	return {
 		name: PLUGIN_NAME,
 		async buildStart() {
+			if (options.runOnce !== false && !isFirstBeforeRun) {
+				return;
+			}
+
+			isFirstBeforeRun = false;
 			cwd = process.cwd();
 			for (const target of targets) {
 				const { trigger } = target;
@@ -87,6 +95,11 @@ export default function DeletePlugin(options) {
 			}
 		},
 		async closeBundle() {
+			if (options.runOnce !== false && !isFirstAfterRun) {
+				return;
+			}
+
+			isFirstAfterRun = false;
 			for (const target of targets) {
 				if (target.trigger === "after") {
 					await execTarget(this, cwd, target);

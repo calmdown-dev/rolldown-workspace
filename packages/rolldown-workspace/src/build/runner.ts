@@ -98,7 +98,7 @@ export async function build(options?: BuildOptions) {
 		}
 
 		// build!
-		await Dispatcher.run(packages, fs, {
+		await Dispatcher.run(packages, {
 			reporter,
 			env,
 			isWatching,
@@ -116,7 +116,5 @@ export async function build(options?: BuildOptions) {
 			const totalTimeTaken = Date.now() - totalStartTime;
 			reporter.println(`done in ${formatTime(totalTimeTaken)}`);
 		}
-
-		process.exit(0);
 	}
 }

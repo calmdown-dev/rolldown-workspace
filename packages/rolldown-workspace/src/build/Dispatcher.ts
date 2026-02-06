@@ -1,119 +1,104 @@
-import { AbortError } from "~/AbortError";
-import type { FileSystem } from "~/FileSystem";
 import type { Package } from "~/workspace";
 
-import { Builder, type BuildCall } from "./Builder";
+import { activity, type Activity } from "./Activity";
+import { Builder, type BuildCall, type BuildHandle } from "./Builder";
 
-interface BuilderEntry {
+interface PackageEntry {
 	readonly pkg: Package;
 	readonly priority: number;
-	readonly builder: Builder;
-	isDirty: boolean;
 }
 
-const DEBOUNCE_MS = 100;
+interface TargetEntry {
+	readonly priority: number;
+	readonly builder: Builder;
+}
+
+interface PendingTarget {
+	readonly target: TargetEntry;
+	readonly handle: BuildHandle;
+}
 
 export class Dispatcher {
-	private readonly controller = new AbortController();
-	private readonly queue: BuilderEntry[] = [];
-	private isActive = false;
+	private readonly queue: PendingTarget[] = [];
+	private isBuilding = false;
 
 	private constructor(
-		private readonly entries: readonly BuilderEntry[],
-		private readonly call: BuildCall,
-	) {
-		const onAbort = () => {
-			this.call.reporter.log("Build", "stopping watchers...", "warn");
-			this.controller.abort(new AbortError());
-		};
-
-		process.on("SIGTERM", onAbort);
-		process.on("SIGINT", onAbort);
-	}
+		private readonly targets: readonly TargetEntry[],
+		private readonly main: Activity,
+	) {}
 
 	private async build() {
-		const signal = this.controller.signal;
-		signal.throwIfAborted();
-
-		for (const entry of this.entries) {
-			await entry.builder.build(this.call, signal);
+		const { main } = this;
+		for (const target of this.targets) {
+			main.ensureActive();
+			await target.builder.build(main);
 		}
 	}
 
-	private watch() {
-		return new Promise<void>(resolve => {
-			const signal = this.controller.signal;
-			signal.throwIfAborted();
-			signal.addEventListener("abort", () => {
-				this.entries.forEach(it => it.builder.stopWatching());
-				resolve();
-			});
+	private async watch() {
+		const { main } = this;
+		const watchers = [];
+		for (const target of this.targets) {
+			main.ensureActive();
+			const result = target.builder.watch(
+				main,
+				handle => this.enqueue(target, handle),
+			);
 
-			for (const entry of this.entries) {
-				entry.builder.startWatching(() => {
-					if (entry.isDirty) {
-						return;
-					}
+			watchers.push(result.watcher.completed);
+			await result.currentBuild.value;
+		}
 
-					entry.isDirty = true;
-					setTimeout(this.enqueue, DEBOUNCE_MS, entry);
-				});
-			}
-		});
+		await Promise.allSettled(watchers);
 	}
 
-	private readonly enqueue = (entry: BuilderEntry) => {
+	private enqueue(target: TargetEntry, handle: BuildHandle) {
 		// find a place in the priority queue (stable ordering)
 		let index = 0;
 		while (index < this.queue.length) {
 			const other = this.queue[index];
-			if (other === entry) {
+			if (other.target === target) {
 				// already queued!
 				return;
 			}
 
-			if (other.priority < entry.priority) {
+			if (other.target.priority < target.priority) {
 				break;
 			}
 
 			index += 1;
 		}
 
-		this.queue.splice(index, 0, entry);
+		this.queue.splice(index, 0, { target, handle });
+		this.triggerNext();
+	}
 
-		// begin build chain, if not already running
-		if (!this.isActive) {
-			void this.buildNext();
-		}
-	};
-
-	private readonly buildNext = async () => {
-		const signal = this.controller.signal;
-		const next = this.queue[0];
-		if (!next || signal.aborted) {
-			this.isActive = false;
+	private readonly triggerNext = () => {
+		if (this.isBuilding || !this.main.isActive) {
 			return;
 		}
 
-		this.isActive = true;
+		const next = this.queue[0];
+		if (!next) {
+			return;
+		}
 
-		await next.builder.build(this.call, signal);
-
-		this.queue.shift();
-		next.isDirty = false;
-
-		await this.buildNext();
+		this.isBuilding = true;
+		next.handle.build()
+			.catch(noop) // ignore
+			.finally(() => {
+				this.queue.shift();
+				this.isBuilding = false;
+				process.nextTick(this.triggerNext);
+			});
 	};
 
-	public static async run(
-		packages: readonly Package[],
-		fs: FileSystem,
-		call: BuildCall,
-	) {
-		// gather entries ordered depth-first, also check for dependency cycles
+
+	public static async run(packages: readonly Package[], call: BuildCall) {
+		// gather package entries ordered depth-first, also check for dependency cycles
 		const visited = new WeakSet<Package>();
 		const visiting = new WeakSet<Package>();
-		const entries: BuilderEntry[] = [];
+		const packageEntires: PackageEntry[] = [];
 
 		let cycleStart: Package | null = null;
 		let cycleInfo = "";
@@ -143,30 +128,48 @@ export class Dispatcher {
 
 			visiting.delete(pkg);
 			visited.add(pkg);
-			entries.push({
-				pkg,
-				priority,
-				builder: new Builder(pkg, fs),
-				isDirty: false,
-			});
+			packageEntires.push({ pkg, priority });
 
 			return true;
 		};
 
 		packages.forEach(visit);
-		entries.sort((a, b) => b.priority - a.priority);
 
-		// update reporter
+		// resolve individual targets
 		const { reporter } = call;
-		for (const entry of entries) {
+		for (const entry of packageEntires) {
 			reporter.addPackage(entry.pkg);
 		}
 
-		// start dispatching
-		const dispatcher = new Dispatcher(entries, call);
-		await dispatcher.build();
-		if (call.isWatching) {
-			await dispatcher.watch();
+		const targetEntries: TargetEntry[] = [];
+		for (const entry of packageEntires) {
+			const targets = await Builder.getTargets(entry.pkg, call);
+			for (const target of targets) {
+				targetEntries.push({
+					priority: entry.priority,
+					builder: new Builder(entry.pkg, target, reporter),
+				});
+			}
 		}
+
+		targetEntries.sort((a, b) => b.priority - a.priority);
+
+		// start the dispatcher
+		const dispatcher = new Dispatcher(
+			targetEntries,
+			activity(stop => {
+				const onStop = () => {
+					reporter.log("Watch Mode", "stopping watchers...");
+					stop();
+				};
+
+				process.on("SIGTERM", onStop);
+				process.on("SIGINT", onStop);
+			}),
+		);
+
+		await (call.isWatching ? dispatcher.watch() : dispatcher.build());
 	}
 }
+
+function noop() {}

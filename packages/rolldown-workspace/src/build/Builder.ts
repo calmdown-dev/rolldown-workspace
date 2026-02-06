@@ -1,56 +1,54 @@
 import { pathToFileURL } from "node:url";
 
-import { rolldown } from "rolldown";
+import { rolldown, watch } from "rolldown";
 
+import type { Reporter } from "~/cli";
 import type { BuildContext, BuildTarget, BuildTask } from "~/factory";
-import type { FileSystem, Watcher } from "~/FileSystem";
 import type { Package } from "~/workspace";
+
+import { activity, type Activity } from "./Activity";
+import { deferred, type CompletableDeferred, type Deferred } from "./Deferred";
 
 export type BuildCall = Omit<BuildContext, "cwd" | "moduleName">;
 
-export type ChangeCallback = () => void;
+export interface BuildHandle {
+	build: () => Promise<void>;
+}
 
-const EMPTY_SET: ReadonlySet<string> = new Set();
-const noop = () => {};
+export interface WatchResult {
+	readonly currentBuild: Deferred;
+	readonly watcher: Activity;
+}
 
 export class Builder {
-	private readonly watchers = new Map<string, Watcher>();
-	private watchFiles: ReadonlySet<string> = EMPTY_SET;
-	private onFileChange: ChangeCallback = noop;
-	private isWatching = false;
-
+	/** @internal */
 	public constructor(
 		private readonly pkg: Package,
-		private readonly fs: FileSystem,
+		private readonly target: BuildTarget,
+		private readonly reporter: Reporter,
 	) {}
 
-	public async build(call: BuildCall, signal?: AbortSignal) {
-		const { pkg } = this;
-		const { reporter } = call;
+	public async build(main: Activity) {
+		const { pkg, reporter, target } = this;
 		let bundle;
 
 		reporter.packageBuildStarted(pkg);
 		try {
 			process.chdir(pkg.directory);
+			bundle = await rolldown({
+				...target.input,
+				cwd: pkg.directory,
+			});
 
-			const watchFiles = new Set<string>();
-			const targets = await this.getTargets(call);
-			for (const target of targets) {
-				signal?.throwIfAborted();
-				bundle = await rolldown(target.input);
-				for (const output of target.outputs) {
-					signal?.throwIfAborted();
-					await bundle.write(output);
-				}
-
-				(await bundle.watchFiles).forEach(it => watchFiles.add(it));
-
-				await bundle.close();
-				bundle = undefined;
+			for (const output of target.outputs) {
+				main.ensureActive();
+				await bundle.write(output);
 			}
 
+			await bundle.close();
+			bundle = undefined;
+
 			reporter.packageBuildSucceeded(pkg);
-			this.setWatchFiles(watchFiles);
 		}
 		catch (ex: any) {
 			reporter.packageBuildFailed(pkg);
@@ -59,60 +57,81 @@ export class Builder {
 		}
 	}
 
-	public startWatching(callback: ChangeCallback) {
-		if (this.isWatching) {
-			return;
-		}
+	public watch(main: Activity, onBuildPending: (handle: BuildHandle) => void): WatchResult {
+		const { pkg, reporter, target } = this;
 
-		this.onFileChange = callback;
-		this.watchFiles.forEach(this.openWatcher);
-		this.isWatching = true;
-	}
-
-	public stopWatching() {
-		if (!this.isWatching) {
-			return;
-		}
-
-		this.watchers.values().forEach(watcher => watcher.close());
-		this.watchers.clear();
-		this.watchFiles = EMPTY_SET;
-		this.onFileChange = noop;
-		this.isWatching = false;
-	}
-
-	private setWatchFiles(nextWatchFiles: ReadonlySet<string>) {
-		if (!this.isWatching) {
-			this.watchFiles = nextWatchFiles;
-			return;
-		}
-
-		const prevWatchFiles = this.watchFiles;
-		prevWatchFiles.difference(nextWatchFiles).forEach(this.closeWatcher);
-		nextWatchFiles.difference(prevWatchFiles).forEach(this.openWatcher);
-
-		this.watchFiles = nextWatchFiles;
-	}
-
-	private readonly closeWatcher = (path: string) => {
-		const watcher = this.watchers.get(path);
-		if (this.watchers.delete(path)) {
-			watcher!.close();
-		}
-	};
-
-	private readonly openWatcher = (path: string) => {
-		const watcher = this.fs.watch(path);
-		watcher.on("change", this.onFileChange);
-		watcher.on("error", () => {
-			this.watchers.delete(path);
+		process.chdir(pkg.directory);
+		const watchOptions = typeof target.input.watch === "object" ? target.input.watch : null;
+		const watcher = watch({
+			...target.input,
+			cwd: pkg.directory,
+			output: target.outputs,
+			watch: {
+				...watchOptions,
+				clearScreen: false,
+			}
 		});
 
-		this.watchers.set(path, watcher);
-	};
+		let currentBuild: CompletableDeferred | null = deferred();
+		watcher.on("restart", () => {
+			const suspension = deferred();
+			onBuildPending({
+				build: () => {
+					currentBuild ??= deferred();
+					suspension.complete();
+					return currentBuild.value;
+				},
+			});
 
-	private async getTargets(call: BuildCall) {
-		const { pkg } = this;
+			return suspension.value;
+		});
+
+		watcher.on("event", async e => {
+			switch (e.code) {
+				case "START":
+					reporter.packageBuildStarted(pkg);
+					process.chdir(pkg.directory);
+					break;
+
+				case "END":
+					reporter.packageBuildSucceeded(pkg);
+					currentBuild?.complete();
+					currentBuild = null;
+					break;
+
+				case "ERROR":
+					reporter.packageBuildFailed(pkg);
+					reporter.logError(pkg.declaration.name, e.error);
+					currentBuild?.fail(e.error);
+					currentBuild = null;
+					break;
+			}
+		});
+
+		return {
+			currentBuild,
+			watcher: activity(async () => {
+				await main.completed;
+				await watcher.close();
+			}),
+		};
+	}
+
+
+	private static readonly targets = new WeakMap<Package, readonly BuildTarget[]>();
+	private static currentTasks: BuildTask[] | null = null;
+
+	/** @internal */
+	public static addBuildTask(task: BuildTask) {
+		if (!Builder.currentTasks) {
+			throw new Error("build configs must be loaded via the build API");
+		}
+
+		Builder.currentTasks.push(task);
+	}
+
+	/** @internal */
+	public static async getTargets(pkg: Package, call: BuildCall) {
 		let targets = Builder.targets.get(pkg);
 		if (targets) {
 			return targets;
@@ -124,6 +143,7 @@ export class Builder {
 				Builder.currentTasks = tasks;
 
 				const url = pathToFileURL(pkg.buildConfigPath).href;
+				process.chdir(pkg.directory);
 				await import(url);
 			}
 			finally {
@@ -140,17 +160,5 @@ export class Builder {
 		targets = (await Promise.all(tasks.map(task => task(context)))).flat(1);
 		Builder.targets.set(pkg, targets);
 		return targets;
-	}
-
-	private static readonly targets = new WeakMap<Package, readonly BuildTarget[]>();
-	private static currentTasks: BuildTask[] | null = null;
-
-	/** @internal */
-	public static addBuildTask(task: BuildTask) {
-		if (!Builder.currentTasks) {
-			throw new Error("build configs must be loaded via the build API");
-		}
-
-		Builder.currentTasks.push(task);
 	}
 }
