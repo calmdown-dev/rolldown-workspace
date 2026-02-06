@@ -1,0 +1,11 @@
+{
+	"name": "@calmdown/rollup-plugin-delete",
+	"version": "1.0.0",
+	"license": "ISC",
+	"type": "module",
+	"exports": {
+		".": {
+			"import": "./index.mjs"
+		}
+	}
+}

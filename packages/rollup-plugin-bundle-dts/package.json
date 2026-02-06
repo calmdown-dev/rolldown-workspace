@@ -1,0 +1,15 @@
+{
+	"name": "@calmdown/rollup-plugin-bundle-dts",
+	"version": "1.0.0",
+	"license": "ISC",
+	"type": "module",
+	"exports": {
+		".": {
+			"import": "./index.mjs"
+		}
+	},
+	"peerDependencies": {
+		"@microsoft/api-extractor": ">=7.56.0",
+		"typescript": ">=5.9.3"
+	}
+}
