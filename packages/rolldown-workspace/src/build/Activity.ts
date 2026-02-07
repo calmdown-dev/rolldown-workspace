@@ -6,11 +6,11 @@ export interface Activity {
 	ensureActive(): void;
 }
 
-export function activity(block: (stop: () => void) => void | Promise<void>): Activity {
-	let isStopped = false;
+export function activity(block: (stop: () => void) => void | Promise<unknown>): Activity {
+	let isActive = true;
 	const completed = new Promise<void>(resolve => {
 		const stop = () => {
-			isStopped = true;
+			isActive = false;
 			resolve();
 		};
 
@@ -19,13 +19,21 @@ export function activity(block: (stop: () => void) => void | Promise<void>): Act
 
 	return {
 		get isActive() {
-			return !isStopped;
+			return isActive;
 		},
 		completed,
-		ensureActive: () => {
-			if (isStopped) {
-				throw new AbortError("the activity was stopped");
-			}
-		},
+		ensureActive,
 	};
+}
+
+activity.completed = {
+	isActive: false,
+	completed: Promise.resolve(),
+	ensureActive,
+} as Activity;
+
+function ensureActive(this: Activity) {
+	if (!this.isActive) {
+		throw new AbortError("the activity was stopped");
+	}
 }

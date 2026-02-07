@@ -7,16 +7,15 @@ import type { Configurator } from "./Entity";
 export type InputConfig = Omit<InputOptions, "cwd" | "input" | "onLog" | "plugins">;
 export type OutputConfig = Omit<OutputOptions, "plugins">;
 
-/** @internal */
-export interface BuildTask {
-	(context: BuildContext): Promise<readonly BuildTarget[]>;
-}
-
-/** @internal */
 export interface BuildTarget {
 	readonly name: string;
 	readonly input: InputOptions;
 	readonly outputs: OutputOptions[];
+}
+
+/** @internal */
+export interface BuildTask {
+	(context: BuildContext): Promise<readonly BuildTarget[]>;
 }
 
 /** @internal */

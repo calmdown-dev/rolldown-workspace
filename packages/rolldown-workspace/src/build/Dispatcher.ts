@@ -33,11 +33,13 @@ export class Dispatcher {
 			main.ensureActive();
 			await target.builder.build(main);
 		}
+
+		return activity.completed;
 	}
 
 	private async watch() {
 		const { main } = this;
-		const watchers = [];
+		const watchers: Promise<void>[] = [];
 		for (const target of this.targets) {
 			main.ensureActive();
 			const result = target.builder.watch(
@@ -49,7 +51,7 @@ export class Dispatcher {
 			await result.currentBuild.value;
 		}
 
-		await Promise.allSettled(watchers);
+		return activity(() => Promise.allSettled(watchers));
 	}
 
 	private enqueue(target: TargetEntry, handle: BuildHandle) {
@@ -173,7 +175,7 @@ export class Dispatcher {
 			}),
 		);
 
-		await (call.isWatching ? dispatcher.watch() : dispatcher.build());
+		return (call.isWatching ? dispatcher.watch() : dispatcher.build());
 	}
 }
 

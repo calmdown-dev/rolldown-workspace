@@ -123,19 +123,17 @@ export const TypeScriptLibrary = defineTarget("TypeScriptLibrary", target => tar
 // ...
 ```
 
-Finally add the build command script in `build.mjs`. It is recommended to set a
-jail directory to constrain all lookups to within the monorepo directory.
+Finally add the build command script in `build.mjs`. The build function comes
+with sensible defaults out of the box, however it is recommended to set at least
+the `jail` directory to constrain all lookups to stay within the monorepo.
 
 ```js
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import * as path from "node:path";
 
 import { build } from "@calmdown/rolldown-workspace";
 
-await build({
-  // jail to the monorepo root directory
-  jail: join(dirname(fileURLToPath(import.meta.url)), ".."),
-});
+const jail = path.join(import.meta.dirname, "../..");
+await build({ jail });
 ```
 
 ### Other Packages

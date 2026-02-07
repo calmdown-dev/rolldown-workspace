@@ -183,7 +183,7 @@ const RE_TERMINATOR = /^\s*?--\s*$/;
 
 export function parseArgs<TArgs extends { [TName in string]?: ArgumentInfo<TName, any, any, boolean> }, TOpts extends { [TName in string]?: OptionInfo<TName, any, any, boolean> }>(
 	command: Command<TArgs, TOpts>,
-	argv: readonly string[],
+	argv: readonly string[] = process.argv.slice(2),
 ) {
 	const args: { [K in string]?: unknown } = {};
 	const opts: { [K in string]?: unknown } = {};

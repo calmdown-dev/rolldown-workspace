@@ -133,7 +133,6 @@ export class Builder {
 		Builder.currentTasks.push(task);
 	}
 
-	/** @internal */
 	public static async getTargets(pkg: Package, call: BuildCall) {
 		let targets = Builder.targets.get(pkg);
 		if (targets) {

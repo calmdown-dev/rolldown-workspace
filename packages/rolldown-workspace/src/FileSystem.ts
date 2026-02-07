@@ -14,7 +14,7 @@ export interface GlobOptions {
 	cwd: string;
 }
 
-export async function getNodeFileSystem(): Promise<FileSystem> {
+export async function defaultFileSystem(): Promise<FileSystem> {
 	const fsPromises = await import("node:fs/promises");
 	return {
 		glob: fsPromises.glob,

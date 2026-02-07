@@ -1,7 +1,8 @@
-import { buildCommand, formatTime, overrideConsole, parseArgs, Reporter } from "~/cli";
+import type { WriteStream } from "node:tty";
+
+import { buildCommand, formatTime, NoOpReporter, overrideConsole, parseArgs, restoreConsole, StreamReporter } from "~/cli";
 import { Env } from "~/factory";
-import { getNodeFileSystem } from "~/FileSystem";
-import { Package, Workspace, type DiscoverWorkspaceOptions } from "~/workspace";
+import { Workspace, type DiscoverWorkspaceOptions } from "~/workspace";
 
 import { Dispatcher } from "./Dispatcher";
 
@@ -17,6 +18,9 @@ export interface BuildOptions extends DiscoverWorkspaceOptions {
 
 	/** whether to run in watch mode, overrides CLI args */
 	watch?: boolean;
+
+	/** the output stream to write CLI info to, null completely disables output, defaults to process.stdout */
+	stdout?: WriteStream | null;
 }
 
 const ENV_MAP: { [K in string]?: Env } = {
@@ -28,7 +32,7 @@ const ENV_MAP: { [K in string]?: Env } = {
 	production: Env.Production,
 };
 
-const command = buildCommand()
+const BuildCommand = buildCommand()
 	.opt("env", {
 		alias: [ "environment" ],
 		flag: "e",
@@ -47,64 +51,60 @@ const command = buildCommand()
 
 export async function build(options?: BuildOptions) {
 	const totalStartTime = Date.now();
-	const reporter = new Reporter(process.stdout);
+	const reporter = options?.stdout === null
+		? NoOpReporter
+		: new StreamReporter(options?.stdout ?? process.stdout);
+
 	let isWatching = false;
 	let isDebug = false;
 
 	try {
-		const argv = options?.argv ?? process.argv.slice(2);
+		const cmd = parseArgs(BuildCommand, options?.argv);
 		const cwd = options?.cwd ?? process.cwd();
-		const cmd = parseArgs(command, argv);
 		isWatching = options?.watch ?? cmd.opts.watch;
 		isDebug = options?.debug ?? cmd.opts.debug;
 
 		// setup reporter
+		reporter.reportStackTraces = isDebug;
 		overrideConsole(reporter);
-		reporter.isDebug = isDebug;
 
 		// detect environment
 		let env = options?.env ?? cmd.opts.env;
 		if (env === undefined) {
 			let tmp;
-			tmp ??= process.env.BUILD_ENV;
 			tmp ??= process.env.NODE_ENV;
+			tmp ??= process.env.BUILD_ENV;
 			tmp ??= process.env.ENVIRONMENT;
 			env = ENV_MAP[tmp?.toLowerCase() ?? ""] ?? Env.Production;
 		}
 
-		// get file system API
-		const fs = options?.fs ?? (await getNodeFileSystem());
-
-		// discover package we started in
-		const startPackage = await Package.discover({ ...options, cwd, fs });
-		if (!startPackage) {
-			throw new Error(`no package found at: ${cwd}`);
-		}
-
-		// discover the whole workspace, if any
-		const workspace = await Workspace.discover({ ...options, cwd, fs });
+		// discover the workspace
+		const { currentPackage, workspace } = await Workspace.discover({ ...options, cwd });
 		let packages;
 
 		// when run in the workspace root, build everything unless it has an override build config
-		if (workspace && workspace.workspaceRoot === startPackage && !startPackage.buildConfigPath) {
+		if (workspace && workspace.workspaceRoot === currentPackage && !currentPackage.buildConfigPath) {
 			packages = workspace.packages;
 		}
-		else {
-			if (!startPackage.buildConfigPath) {
-				throw new Error(`package '${startPackage.declaration.name}' has no build config`);
+		else if (currentPackage) {
+			if (!currentPackage.buildConfigPath) {
+				throw new Error(`package '${currentPackage.declaration.name}' has no build config`);
 			}
 
-			packages = [ startPackage ];
+			packages = [ currentPackage ];
+		}
+		else {
+			throw new Error("no package was found");
 		}
 
-		// build!
-		await Dispatcher.run(packages, {
+		const activity = await Dispatcher.run(packages, {
 			reporter,
 			env,
 			isWatching,
 			isDebug,
 		});
 
+		await activity.completed;
 		process.exitCode = 0;
 	}
 	catch (ex: any) {
@@ -112,12 +112,13 @@ export async function build(options?: BuildOptions) {
 		process.exitCode = 1;
 	}
 	finally {
-		reporter.finish();
-		reporter.println();
-
+		let outro = "";
 		if (!isWatching) {
 			const totalTimeTaken = Date.now() - totalStartTime;
-			reporter.println(`done in ${formatTime(totalTimeTaken)}`);
+			outro = `done in ${formatTime(totalTimeTaken)}`;
 		}
+
+		reporter.finish(outro);
+		restoreConsole();
 	}
 }

@@ -1,6 +1,6 @@
 import * as path from "node:path";
 
-import type { FileSystem } from "~/FileSystem";
+import { defaultFileSystem, type FileSystem } from "~/FileSystem";
 
 export interface PackageDeclaration {
 	[key: string]: unknown;
@@ -14,10 +14,6 @@ export interface PackageDeclaration {
 }
 
 export type DependencyMap = { [TName in string]?: string };
-
-export interface TraversalOptions {
-	deep?: boolean;
-}
 
 export interface DiscoverPackageOptions {
 	/** the directory where to start the discovery, defaults to `process.cwd()` */
@@ -36,13 +32,11 @@ export interface DiscoverPackageOptions {
 export class Package {
 	/**
 	 * list of downstream workspace dependencies, i.e. other ws packages this one depends on, but not any 3rd-party ones
-	 * @internal
 	 */
 	public readonly downstreamDependencies: Package[] = [];
 
 	/**
 	 * list of upstream workspace dependents, i.e. other ws packages that depend on this one, but not any 3rd-party ones
-	 * @internal
 	 */
 	public readonly upstreamDependents: Package[] = [];
 
@@ -61,7 +55,7 @@ export class Package {
 	private static readonly cache = new Map<string, Package | null>();
 
 	public static async discover(options?: DiscoverPackageOptions) {
-		const fs = options?.fs ?? await import("node:fs/promises");
+		const fs = options?.fs ?? await defaultFileSystem();
 		const visitedDirs: string[] = [];
 		let cacheEntry: Package | null = null;
 
@@ -129,13 +123,19 @@ export class Package {
 
 			// look for build config
 			const buildConfigGlob = options?.buildConfigGlob ?? "build.config.{js,mjs}";
+			const iterator = fs.glob(buildConfigGlob, { cwd });
 			let buildConfigPath: string | undefined;
-			for await (const hint of fs.glob(buildConfigGlob, { cwd })) {
-				if (buildConfigPath) {
-					throw new Error(`multiple build config files found in: ${cwd}`);
-				}
+			try {
+				for await (const hint of iterator) {
+					if (buildConfigPath) {
+						throw new Error(`multiple build config files found in: ${cwd}`);
+					}
 
-				buildConfigPath = path.join(cwd, hint);
+					buildConfigPath = path.join(cwd, hint);
+				}
+			}
+			finally {
+				await iterator.return?.();
 			}
 
 			return (cacheEntry = new Package(cwd, declaration, buildConfigPath));

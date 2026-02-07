@@ -1,5 +1,7 @@
 import * as path from "node:path";
 
+import { defaultFileSystem } from "~/FileSystem";
+
 import { DiscoverPackageOptions, Package } from "./Package";
 
 export interface DiscoverWorkspaceOptions extends DiscoverPackageOptions {
@@ -11,6 +13,11 @@ export interface DiscoverWorkspaceOptions extends DiscoverPackageOptions {
 
 	/** filters the refs to consider as workspace refs, defaults to: `ref => ref.startsWith("workspace:")` */
 	refFilter?: (ref: string) => boolean;
+}
+
+export interface DiscoverWorkspaceResult {
+	currentPackage: Package | null;
+	workspace: Workspace | null;
 }
 
 export enum DependencyKind {
@@ -34,26 +41,30 @@ export class Workspace {
 	) {}
 
 
-	public static async discover(options?: DiscoverWorkspaceOptions) {
-		const fs = options?.fs ?? await import("node:fs/promises");
-		const jail = options?.jail ? path.resolve(options?.jail) : "";
+	public static async discover(options?: DiscoverWorkspaceOptions): Promise<DiscoverWorkspaceResult> {
+		const fs = options?.fs ?? await defaultFileSystem();
 
 		// find the root package first
+		let currentPackage: Package | null = null;
 		let cwd = options?.cwd ? path.resolve(options.cwd) : process.cwd();
 		let depth = 0;
 		let root;
 
-		while (cwd.startsWith(jail) && ++depth < 128) {
-			root = await Package.discover({ ...options, cwd });
-			if (root?.declaration.workspaces) {
+		while (true) {
+			root = await Package.discover({ ...options, cwd, fs });
+			if (!root) {
 				break;
 			}
 
-			// we may have found a package, just not the workspace root one - if so, continue from
-			// its directory to skip directories already searched by Package.discover, otherwise
-			// continue climbing from cwd
+			currentPackage ??= root;
+			if (root.declaration.workspaces) {
+				break;
+			}
+
+			// we found a package, just not the workspace root one -> continue from its directory to
+			// skip directories already searched by Package.discover
 			const parentDir = path.join(root?.directory ?? cwd, "..");
-			if (parentDir === cwd) {
+			if (parentDir === cwd || ++depth >= 128) {
 				break;
 			}
 
@@ -61,13 +72,16 @@ export class Workspace {
 		}
 
 		if (!root?.declaration.workspaces) {
-			return null;
+			return {
+				currentPackage,
+				workspace: null,
+			};
 		}
 
 		// discover individual packages
 		const exclude = options?.exclude ?? [ "build-logic" ];
 		const pending: Promise<void>[] = [];
-		const packages: Package[] = [ root ];
+		const packages = new Set<Package>([ root ]);
 		cwd = root.directory;
 
 		for await (const pathHint of fs.glob(root.declaration.workspaces, { cwd })) {
@@ -79,7 +93,7 @@ export class Workspace {
 					});
 
 					if (pkg && !exclude.includes(pkg.declaration.name)) {
-						packages.push(pkg);
+						packages.add(pkg);
 					}
 				})(),
 			);
@@ -102,6 +116,9 @@ export class Workspace {
 			});
 		});
 
-		return new Workspace(packages, root);
+		return {
+			currentPackage,
+			workspace: new Workspace(Array.from(packages), root),
+		};
 	}
 }
