@@ -10,18 +10,19 @@ const SL_LINK_RELATIVE = "link-relative";
 
 /**
  * @typedef {Object} CopyTarget
- * @property {string} destination - Where files should be copied or linked
- * @property {string} [baseDir] - Base directory for relative paths (optional)
- * @property {string|string[]} include - Glob pattern(s) of files to include
- * @property {string|string[]} [exclude] - Glob pattern(s) to exclude (optional)
- * @property {"before"|"after"} [trigger="after"] - When to run the operation (defaults to "after")
+ * @property {string} destination where files should be copied or linked
+ * @property {string} [baseDir] base directory for relative paths (defaults to current directory)
+ * @property {string|string[]} include glob pattern(s) of files to include
+ * @property {string|string[]} [exclude] glob pattern(s) to exclude (optional)
+ * @property {"before"|"after"} [trigger="after"] when to run the operation (defaults to "after")
  */
 
 /**
  * @typedef {Object} CopyOptions
- * @property {boolean} [dryRun=false] - If true, only logs actions without executing
- * @property {"ignore"|"copy-file"|"link-absolute"|"link-relative"} [symLinks="ignore"] - How to handle symlinks (defaults to "ignore")
- * @property {CopyTarget[]} targets - List of copy/link operations
+ * @property {CopyTarget[]} targets desired copy/link operations
+ * @property {boolean} [dryRun=false] whether to perform a dry run, only logging actions without executing them (defaults to false)
+ * @property {boolean} [runOnce=true] when in watch mode, controls whether to only delete files on the first build (defaults to true)
+ * @property {"ignore"|"copy-file"|"link-absolute"|"link-relative"} [symLinks="ignore"] how to handle symlinks (defaults to "ignore")
  */
 
 /**
@@ -71,7 +72,7 @@ export default function CopyPlugin(options) {
 
 			if (entry.isFile()) {
 				await exec(context, null, () => fs.mkdir(dstDir, { recursive: true }));
-				await exec(context, `Would copy file "${srcPath}" to "${dstPath}".`, () => fs.copyFile(srcPath, dstPath));
+				await exec(context, `would copy file ${srcPath} -> ${dstPath}`, () => fs.copyFile(srcPath, dstPath));
 				context.addWatchFile(srcPath);
 			}
 			else if (entry.isSymbolicLink() && symLinks !== SL_IGNORE) {
@@ -83,16 +84,16 @@ export default function CopyPlugin(options) {
 				await exec(context, null, () => fs.mkdir(dstDir, { recursive: true }));
 				switch (symLinks) {
 					case SL_COPY_FILE:
-						await exec(context, `Would copy file "${linkedPath}" to "${dstPath}" resolved from symlink "${srcPath}".`, () => fs.copyFile(linkedPath, dstPath));
+						await exec(context, `would copy file ${linkedPath} -> ${dstPath} resolved from symlink ${srcPath}`, () => fs.copyFile(linkedPath, dstPath));
 						break;
 
 					case SL_LINK_ABSOLUTE:
-						await exec(context, `Would create symlink "${dstPath}" pointing to "${linkedPath}" resolved from symlink "${srcPath}".`, () => fs.symlink(linkedPath, dstPath));
+						await exec(context, `would create symlink ${dstPath} pointing to ${linkedPath} resolved from symlink ${srcPath}`, () => fs.symlink(linkedPath, dstPath));
 						break;
 
 					case SL_LINK_RELATIVE: {
 						const linkTargetPath = path.relative(dstPath, linkedPath);
-						await exec(context, `Would create symlink "${dstPath}" pointing to "${linkTargetPath}" resolved from symlink "${srcPath}".`, () => fs.symlink(linkTargetPath, dstPath));
+						await exec(context, `would create symlink ${dstPath} pointing to ${linkTargetPath} resolved from symlink ${srcPath}`, () => fs.symlink(linkTargetPath, dstPath));
 						break;
 					}
 				}
@@ -103,9 +104,16 @@ export default function CopyPlugin(options) {
 	};
 
 	let cwd = undefined;
+	let isFirstBeforeRun = true;
+	let isFirstAfterRun = true;
 	return {
 		name: PLUGIN_NAME,
 		async buildStart() {
+			if (options.runOnce !== false && !isFirstBeforeRun) {
+				return;
+			}
+
+			isFirstBeforeRun = false;
 			cwd = process.cwd();
 			for (const target of targets) {
 				if (target.trigger === "before") {
@@ -114,6 +122,11 @@ export default function CopyPlugin(options) {
 			}
 		},
 		async closeBundle() {
+			if (options.runOnce !== false && !isFirstAfterRun) {
+				return;
+			}
+
+			isFirstAfterRun = false;
 			for (const target of targets) {
 				const { trigger } = target;
 				if (trigger === "after" || trigger === undefined) {

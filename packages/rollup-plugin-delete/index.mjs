@@ -5,16 +5,16 @@ const PLUGIN_NAME = "Delete";
 
 /**
  * @typedef {Object} DeleteTarget
- * @property {string|string[]} include - glob pattern(s) of files to include
- * @property {string|string[]} [exclude] - glob pattern(s) to exclude (optional)
- * @property {"before"|"after"} [trigger="before"] - when to run the operation (defaults to "before")
+ * @property {string|string[]} include glob pattern(s) of files to include
+ * @property {string|string[]} [exclude] glob pattern(s) to exclude (optional)
+ * @property {"before"|"after"} [trigger="before"] when to run the operation (defaults to "before")
  */
 
 /**
  * @typedef {Object} DeleteOptions
- * @property {boolean} [dryRun=false] - whether to perform a dry run: only log actions without executing them
- * @property {boolean} [runOnce=true] - when in watch mode, controls whether to only delete files on the first build
- * @property {(string|DeleteTarget)|(string|DeleteTarget)[]} targets - list of delete operations
+ * @property {(string|DeleteTarget)|(string|DeleteTarget)[]} targets desired delete operations
+ * @property {boolean} [dryRun=false] whether to perform a dry run, only logging actions without executing them (defaults to false)
+ * @property {boolean} [runOnce=true] when in watch mode, controls whether to only delete files on the first build (defaults to true)
  */
 
 /**
@@ -56,14 +56,14 @@ export default function DeletePlugin(options) {
 		for (const entry of entries) {
 			const entryPath = path.join(entry.parentPath, entry.name);
 			if (entry.isFile()) {
-				await exec(context, `Would delete file "${entryPath}".`, () => fs.unlink(entryPath));
+				await exec(context, `would delete file ${entryPath}`, () => fs.unlink(entryPath));
 			}
 			else if (entry.isSymbolicLink()) {
-				await exec(context, `Would delete symlink "${entryPath}".`, () => fs.unlink(entryPath));
+				await exec(context, `would delete symlink ${entryPath}`, () => fs.unlink(entryPath));
 			}
 			else if (entry.isDirectory()) {
 				try {
-					await exec(context, `Would delete directory "${entryPath}".`, () => fs.rmdir(entryPath));
+					await exec(context, `would delete directory ${entryPath}`, () => fs.rmdir(entryPath));
 				}
 				catch (ex) {
 					// ignore errors when directory is not empty

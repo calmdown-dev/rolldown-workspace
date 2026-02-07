@@ -104,9 +104,12 @@ export async function build(options?: BuildOptions) {
 			isWatching,
 			isDebug,
 		});
+
+		process.exitCode = 0;
 	}
 	catch (ex: any) {
 		reporter.logError("Error", ex);
+		process.exitCode = 1;
 	}
 	finally {
 		reporter.finish();

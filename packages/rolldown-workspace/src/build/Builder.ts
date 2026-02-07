@@ -69,7 +69,7 @@ export class Builder {
 			watch: {
 				...watchOptions,
 				clearScreen: false,
-			}
+			},
 		});
 
 		let currentBuild: CompletableDeferred | null = deferred();
@@ -86,25 +86,28 @@ export class Builder {
 			return suspension.value;
 		});
 
-		watcher.on("event", async e => {
+		watcher.on("event", e => {
 			switch (e.code) {
 				case "START":
 					reporter.packageBuildStarted(pkg);
 					process.chdir(pkg.directory);
-					break;
+					return undefined;
+
+				case "BUNDLE_END":
+					return e.result.close();
 
 				case "END":
 					reporter.packageBuildSucceeded(pkg);
 					currentBuild?.complete();
 					currentBuild = null;
-					break;
+					return undefined;
 
 				case "ERROR":
 					reporter.packageBuildFailed(pkg);
 					reporter.logError(pkg.declaration.name, e.error);
 					currentBuild?.fail(e.error);
 					currentBuild = null;
-					break;
+					return undefined;
 			}
 		});
 

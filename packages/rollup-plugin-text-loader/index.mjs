@@ -4,8 +4,8 @@ const PLUGIN_NAME = "TextLoader";
 
 /**
  * @typedef {Object} TextLoaderOptions
- * @property {string|string[]} include - Glob pattern(s) of files to include
- * @property {string|string[]} [exclude] - Glob pattern(s) to exclude (optional)
+ * @property {string|string[]} include glob pattern(s) of files to include
+ * @property {string|string[]} [exclude] glob pattern(s) to exclude (optional)
  */
 
 /**
@@ -55,5 +55,5 @@ function quoteText(text) {
 		}
 	}
 
-	return "`\\" + result + text.slice(anchor) + "`";
+	return "`\\\n" + result + text.slice(anchor) + "`";
 }

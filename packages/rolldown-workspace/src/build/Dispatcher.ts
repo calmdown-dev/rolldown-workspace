@@ -150,6 +150,11 @@ export class Dispatcher {
 					builder: new Builder(entry.pkg, target, reporter),
 				});
 			}
+
+			if (targets.length === 0) {
+				reporter.setStatus(entry.pkg, "SKIP");
+				reporter.setMessage(entry.pkg, entry.pkg.buildConfigPath ? "no targets defined" : "no build config");
+			}
 		}
 
 		targetEntries.sort((a, b) => b.priority - a.priority);

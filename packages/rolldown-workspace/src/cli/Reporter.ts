@@ -6,6 +6,8 @@ import type { LogLevel as RolldownLogLevel } from "rolldown";
 import { AbortError } from "~/AbortError";
 import type { Package } from "~/workspace";
 
+import { formatTime } from "./common";
+
 export type LogLevel = RolldownLogLevel | "error";
 
 export interface PackageInfo {
@@ -35,7 +37,7 @@ const ANSI_BOLD = "1m";
 const StatusColor: Record<StatusKind, string> = {
 	FAIL: ANSI_RED,
 	BUSY: ANSI_CYAN,
-	IDLE: ANSI_YELLOW,
+	IDLE: ANSI_HI_BLACK,
 	PASS: ANSI_GREEN,
 	SKIP: ANSI_YELLOW,
 };
@@ -64,16 +66,18 @@ export class Reporter {
 	public log(title: string, message: string, level: LogLevel = "info") {
 		let output = "";
 		if (this.lastLogTitle !== title) {
-			output = `${EOL}${this.format(title, ANSI_BOLD)}${EOL}┌${"─".repeat(title.length - 1)}${EOL}`;
+			const underline = "╭" + ("─".repeat(title.length - 1));
+			output = `${EOL}${this.format(title, ANSI_BOLD)}${EOL}${this.format(underline, ANSI_HI_BLACK)}${EOL}`;
 			this.lastLogTitle = title;
 		}
 
+		const brace = this.format("│", ANSI_HI_BLACK);
 		const formatted = message
 			.split(/(?:\r\n|\n|\r)+/g)
 			.map(line => this.format(line, LogLevelColor[level]))
-			.join(`${EOL}| `);
+			.join(`${EOL}${brace} `);
 
-		output += `│ ${formatted}${EOL}`;
+		output += `${brace} ${formatted}${EOL}`;
 		this.writeOutput(output);
 	}
 
@@ -85,9 +89,22 @@ export class Reporter {
 		this.log(title, (this.isDebug ? ex.stack : null) ?? ex.toString(), "error");
 	}
 
-	public addPackage(pkg: Package, status: StatusKind = "IDLE", message?: string) {
+	public addPackage(pkg: Package) {
+		const info = this.getInfoFor(pkg);
+		info.status = "IDLE";
+
+		this.scheduleUpdate();
+	}
+
+	public setStatus(pkg: Package, status: StatusKind) {
 		const info = this.getInfoFor(pkg);
 		info.status = status;
+
+		this.scheduleUpdate();
+	}
+
+	public setMessage(pkg: Package, message: string) {
+		const info = this.getInfoFor(pkg);
 		info.message = message;
 
 		this.scheduleUpdate();
@@ -129,7 +146,11 @@ export class Reporter {
 
 
 	private format(text: string, ansiCode: string) {
-		return this.isFormatted ? `\u001b[${ansiCode}${text}\u001b[0m` : text;
+		return this.isFormatted
+			? /^\s*$/.test(text)
+				? text
+				: `\u001b[${ansiCode}${text}\u001b[0m`
+			: text;
 	}
 
 	private getInfoFor(pkg: Package) {
@@ -207,7 +228,7 @@ export class Reporter {
 			label = this.format(info.status, StatusColor[info.status]);
 
 			if (info.buildStartTime > 0 && info.buildEndTime >= info.buildStartTime) {
-				extra += ` (${formatTime(info.buildEndTime - info.buildStartTime)})`;
+				extra += ` · ${formatTime(info.buildEndTime - info.buildStartTime)}`;
 			}
 
 			if (info.message) {
@@ -221,7 +242,7 @@ export class Reporter {
 		let result;
 
 		let lineCount = 1;
-		let output = `${label} ${this.format(prefix + li0, ANSI_HI_BLACK)}${this.format(pkg.declaration.name, ANSI_BOLD)}${extra}${EOL}`;
+		let output = `${label} ${this.format(prefix + li0, ANSI_HI_BLACK)}${this.format(pkg.declaration.name, ANSI_BOLD)}${this.format(extra, ANSI_HI_BLACK)}${EOL}`;
 
 		for (; index < length; index += 1) {
 			isLast = index + 1 === length;
@@ -240,10 +261,4 @@ export class Reporter {
 	}
 }
 
-export function formatTime(timeMs: number): string {
-	if (timeMs >= 1_000) {
-		return `${(Math.round(timeMs / 100) / 10).toFixed(1)}s`;
-	}
 
-	return `${timeMs.toFixed(0)}ms`;
-}
