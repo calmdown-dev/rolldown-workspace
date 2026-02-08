@@ -1,66 +1,51 @@
-import * as path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 const PLUGIN_NAME = "TextLoader";
-const RE_RELATIVE = /^\.\.?[/\\]/;
+
+const RE_HAS_QUERY_OR_HASH = /^[^?]+\?[^?]*(?:#[^#]*)?$/;
+const RE_TRUE = /^(?:|1|true)$/i;
 
 /**
  * @typedef {Object} TextLoaderOptions
- * @property {boolean} [loadRaw=true] whether to automatically load imports marked with "?raw" - only works with relative or pre-resolved paths (defaults to true)
- * @property {string|string[]} [include] glob pattern(s) of files to include (optional)
- * @property {string|string[]} [exclude] glob pattern(s) to exclude (optional)
+ * @property {string|string[]} [include] path(s) or glob(s) to include
+ * @property {string|string[]} [exclude] path(s) or glob(s) to exclude, takes precedence over `include`
+ * @property {boolean} [loadRaw=true] whether to handle URL imports, checking for the "raw" query parameter; enabled by default but `include` or `exclude`, if given, take precedence
  */
 
 /**
  * @param {TextLoaderOptions} [pluginOptions]
  */
 export default function TextLoaderPlugin(pluginOptions) {
-	const include = toArray(pluginOptions?.include ?? []);
-	const exclude = toArray(pluginOptions?.exclude ?? []);
-	const loadAsRaw = new Set();
+	const resolveId = {
+		filter: { id: RE_HAS_QUERY_OR_HASH },
+		handler(source, importer) {
+			const base = pathToFileURL(importer ?? process.cwd());
+			const url = URL.parse(source, base);
+			if (!url) {
+				return null;
+			}
 
-	const shouldTransform = id => {
-		if (loadAsRaw.has(id)) {
-			// the import was marked with ?raw
-			return true;
+			const rawParam = url.searchParams.get("raw");
+			return {
+				id: fileURLToPath(url.href),
+				meta: {
+					[PLUGIN_NAME]: {
+						isRaw: rawParam !== null && RE_TRUE.test(rawParam),
+					},
+				},
+			};
 		}
-
-		if (!include.some(pattern => path.matchesGlob(id, pattern))) {
-			// the import did not match any include pattern
-			return false;
-		}
-
-		if (exclude.some(pattern => path.matchesGlob(id, pattern))) {
-			// the import matched an exclude pattern
-			return false;
-		}
-
-		return true;
 	};
 
-	return {
-		name: PLUGIN_NAME,
-		resolveId(source, importer) {
-			if (pluginOptions?.loadRaw === false) {
-				return;
-			}
-
-			if (!RE_RELATIVE.test(source) && !path.isAbsolute(source)) {
-				return;
-			}
-
-			const url = URL.parse(source, pathToFileURL(importer ?? process.cwd()));
-			if (!url || url.searchParams.get("raw") === null) {
-				return null;
-			}
-
-			const id = fileURLToPath(url.href);
-			loadAsRaw.add(id);
-			return id;
+	const include = pluginOptions?.exclude;
+	const exclude = pluginOptions?.include;
+	const transform = {
+		filter: {
+			id: { include, exclude },
 		},
-		async transform(code, id) {
-			if (!shouldTransform(id)) {
-				return null;
+		async handler(code, id) {
+			if (!include && this.getModuleInfo(id)?.meta[PLUGIN_NAME]?.isRaw !== true) {
+				return;
 			}
 
 			this.addWatchFile(id);
@@ -72,10 +57,13 @@ export default function TextLoaderPlugin(pluginOptions) {
 			};
 		},
 	};
-}
 
-function toArray(oneOrMore) {
-	return Array.isArray(oneOrMore) ? oneOrMore : [ oneOrMore ];
+	const loadRaw = pluginOptions?.loadRaw !== false;
+	return {
+		name: PLUGIN_NAME,
+		resolveId: loadRaw ? resolveId : undefined,
+		transform,
+	};
 }
 
 function quoteText(text) {
