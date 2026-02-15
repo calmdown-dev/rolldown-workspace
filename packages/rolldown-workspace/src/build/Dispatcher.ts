@@ -1,3 +1,4 @@
+import type { Reporter } from "~/cli";
 import type { Package } from "~/workspace";
 
 import { activity, type Activity } from "./Activity";
@@ -24,14 +25,23 @@ export class Dispatcher {
 
 	private constructor(
 		private readonly targets: readonly TargetEntry[],
+		private readonly reporter: Reporter,
 		private readonly main: Activity,
 	) {}
 
 	private async build() {
 		const { main } = this;
-		for (const target of this.targets) {
-			main.ensureActive();
-			await target.builder.build(main);
+		let index = 0;
+		try {
+			while (index < this.targets.length) {
+				main.ensureActive();
+				await this.targets[index++].builder.build(main);
+			}
+		}
+		catch {
+			while (index < this.targets.length) {
+				this.reporter.setStatus(this.targets[index++].builder.pkg, "SKIP");
+			}
 		}
 
 		return activity.completed;
@@ -51,7 +61,11 @@ export class Dispatcher {
 			await result.currentBuild.value;
 		}
 
-		return activity(() => Promise.allSettled(watchers));
+		return activity(async () => {
+			await main.completed;
+			this.reporter.log("Watch Mode", "stopping watchers...");
+			await Promise.allSettled(watchers);
+		});
 	}
 
 	private enqueue(target: TargetEntry, handle: BuildHandle) {
@@ -96,7 +110,11 @@ export class Dispatcher {
 	};
 
 
-	public static async run(packages: readonly Package[], call: BuildCall) {
+	public static async run(
+		packages: readonly Package[],
+		call: BuildCall,
+		main: Activity = activity.untilSignal("SIGTERM", "SIGINT"),
+	) {
 		// gather package entries ordered depth-first, also check for dependency cycles
 		const visited = new WeakSet<Package>();
 		const visiting = new WeakSet<Package>();
@@ -162,19 +180,7 @@ export class Dispatcher {
 		targetEntries.sort((a, b) => b.priority - a.priority);
 
 		// start the dispatcher
-		const dispatcher = new Dispatcher(
-			targetEntries,
-			activity(stop => {
-				const onStop = () => {
-					reporter.log("Watch Mode", "stopping watchers...");
-					stop();
-				};
-
-				process.on("SIGTERM", onStop);
-				process.on("SIGINT", onStop);
-			}),
-		);
-
+		const dispatcher = new Dispatcher(targetEntries, reporter, main);
 		return (call.isWatching ? dispatcher.watch() : dispatcher.build());
 	}
 }

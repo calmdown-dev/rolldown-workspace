@@ -23,7 +23,7 @@ export interface WatchResult {
 export class Builder {
 	/** @internal */
 	public constructor(
-		private readonly pkg: Package,
+		public readonly pkg: Package,
 		private readonly target: BuildTarget,
 		private readonly reporter: Reporter,
 	) {}
@@ -54,6 +54,7 @@ export class Builder {
 			reporter.packageBuildFailed(pkg);
 			reporter.logError(pkg.declaration.name, ex);
 			await bundle?.close();
+			throw ex;
 		}
 	}
 
