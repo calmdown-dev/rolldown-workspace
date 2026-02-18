@@ -2,8 +2,6 @@ import type { InputOptions, OutputOptions } from "rolldown";
 
 import type { Reporter } from "~/cli";
 
-import type { Configurator } from "./Entity";
-
 export type InputConfig = Omit<InputOptions, "cwd" | "input" | "onLog" | "plugins">;
 export type OutputConfig = Omit<OutputOptions, "plugins">;
 
@@ -30,7 +28,7 @@ export interface BuildContext {
 	readonly env: Env;
 	readonly moduleName: string;
 	readonly isWatching: boolean;
-	readonly isDebug: boolean;
+	readonly isDebugging: boolean;
 }
 
 export enum Env {
@@ -39,6 +37,28 @@ export enum Env {
 	Production = "prod",
 }
 
-export function inEnv(...envs: Env[]): Configurator<boolean> {
-	return (_, context) => envs.includes(context.env);
+interface UtilityConfigurator {
+	(context: BuildContext): boolean;
+	(current: boolean, context: BuildContext): boolean;
+}
+
+function utilityConfigurator<TArgs extends any[]>(
+	block: (context: BuildContext, ...args: TArgs) => boolean,
+	...args: TArgs
+): UtilityConfigurator {
+	return (arg0: BuildContext | boolean, arg1?: BuildContext) => {
+		const context = typeof arg0 === "boolean" ? arg1! : arg0;
+		return block(context, ...args);
+	};
+}
+
+export const inDevelopment = utilityConfigurator(context => context.env === Env.Development);
+export const inStaging = utilityConfigurator(context => context.env === Env.Staging);
+export const inProduction = utilityConfigurator(context => context.env === Env.Production);
+export const inWatchMode = utilityConfigurator(context => context.isWatching);
+export const inDebugMode = utilityConfigurator(context => context.isDebugging);
+
+export function inEnv(env0: Env, ...more: Env[]): UtilityConfigurator;
+export function inEnv(...envs: Env[]) {
+	return utilityConfigurator(context => envs.includes(context.env));
 }

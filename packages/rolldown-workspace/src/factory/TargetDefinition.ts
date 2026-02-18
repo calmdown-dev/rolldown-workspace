@@ -162,7 +162,7 @@ function onBuild(
 							return;
 						}
 
-						if (level !== "debug" || context.isDebug) {
+						if (level !== "debug" || context.isDebugging) {
 							const message = `${log.pluginCode ? `[${log.pluginCode}]` : ""}${log.message}`;
 							context.reporter.log(context.moduleName, message, level);
 						}

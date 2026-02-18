@@ -56,16 +56,16 @@ export async function build(options?: BuildOptions) {
 		: new StreamReporter(options?.stdout ?? process.stdout);
 
 	let isWatching = false;
-	let isDebug = false;
+	let isDebugging = false;
 
 	try {
 		const cmd = parseArgs(BuildCommand, options?.argv);
 		const cwd = options?.cwd ?? process.cwd();
 		isWatching = options?.watch ?? cmd.opts.watch;
-		isDebug = options?.debug ?? cmd.opts.debug;
+		isDebugging = options?.debug ?? cmd.opts.debug;
 
 		// setup reporter
-		reporter.reportStackTraces = isDebug;
+		reporter.reportStackTraces = isDebugging;
 		overrideConsole(reporter);
 
 		// detect environment
@@ -101,7 +101,7 @@ export async function build(options?: BuildOptions) {
 			reporter,
 			env,
 			isWatching,
-			isDebug,
+			isDebugging,
 		});
 
 		await activity.completed;
