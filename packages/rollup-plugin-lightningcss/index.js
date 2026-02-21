@@ -10,129 +10,160 @@ const RE_MODULE = /\.module\.css$/i;
  * @typedef {Object} LightningCssPluginOptions
  * @property {string|string[]} [include] glob pattern(s) of files to include, defaults to `**‍/*.css`
  * @property {string|string[]} [exclude] glob pattern(s) to exclude (optional)
- * @property {Omit<import("lightningcss").TransformOptions, "code" | "filename">} [lightningcss] custom inline LightningCSS options
+ * @property {Omit<import("lightningcss").TransformOptions, "code" | "filename" | "sourceMap" | "minify">} [lightningcss] custom inline LightningCSS options
  */
 
 /**
  * @param {LightningCssPluginOptions} pluginOptions
  */
 export default function LightningCssPlugin(pluginOptions) {
-	const chunkMap = new Map();
-	const filter = {
-		id: {
-			include: pluginOptions?.include ?? "**/*.css",
-			exclude: pluginOptions?.exclude,
-		},
-	};
-
 	const lightningCssConfig = {
 		...pluginOptions?.lightningcss,
 		cssModules: pluginOptions?.lightningcss.cssModules ?? true,
-		sourceMap: pluginOptions?.lightningcss.sourceMap ?? true,
-		minify: pluginOptions?.lightningcss.minify ?? true,
 	};
 
-	const modulesEnabled = !!lightningCssConfig.cssModules;
-	const sourcemapEnabled = !!lightningCssConfig.sourceMap;
+	const chunkMap = new Map();
+	const modulesEnabled = Boolean(lightningCssConfig.cssModules);
+	let root;
 
-	let cwd;
 	return {
 		name: PLUGIN_NAME,
+		buildStart(inputOptions) {
+			root = inputOptions.cwd ?? process.cwd();
+		},
 		transform: {
-			filter,
+			filter: {
+				id: {
+					include: pluginOptions?.include ?? "**/*.css",
+					exclude: pluginOptions?.exclude,
+				},
+			},
 			handler(code, moduleId) {
 				let chunk = chunkMap.get(moduleId);
 				if (chunk) {
-					return chunk.js;
+					return chunk.transformResult;
 				}
 
-				const filename = path.basename(moduleId);
-				const isModule = modulesEnabled && RE_MODULE.test(filename);
-				const result = transform({
-					...lightningCssConfig,
-					filename,
-					code: Buffer.from(code, "utf8"),
-				});
+				// prepare a buffer with the CSS code
+				const codeBuffer = Buffer.from(code, "utf8");
 
-				// forward warnings to Rollup
-				for (const warning of result.warnings) {
-					this.warn({
-						code: warning.type,
-						message: warning.message,
-						loc: {
-							column: warning.loc.column,
-							line: warning.loc.line,
-							file: warning.loc.filename,
-						},
+				// Because we don't know the output options yet (there may also be more than one
+				// output), we have to pre-transform CSS modules to know the exports ahead of time.
+				let jsCode;
+				if (modulesEnabled && RE_MODULE.test(moduleId)) {
+					const { exports } = transform({
+						...lightningCssConfig,
+						filename: moduleId,
+						code: codeBuffer,
+						projectRoot: root,
+						minify: false,
+						sourceMap: false,
 					});
-				}
 
-				// get sourcemap if enabled
-				let sourcemap = null;
-				if (sourcemapEnabled) {
-					try {
-						sourcemap = JSON.parse(result.map.toString("utf8"));
-						if (sourcemap?.version !== 3) {
-							throw new Error("expected sourcemap version 3");
-						}
-					}
-					catch (ex) {
-						this.warn({
-							code: "E_SOURCEMAP",
-							message: `failed to parse sourcemap, ${ex.message}`,
-						});
-					}
+					const classMap = Object
+						.keys(exports)
+						.reduce((map, key) => (map[key] = exports[key].name, map), {});
+
+					jsCode = `export default ${JSON.stringify(classMap)};`;
+				}
+				else {
+					jsCode = "export {};";
 				}
 
 				// cache the current chunk
 				chunkMap.set(moduleId, chunk = {
 					moduleId,
-					filename,
-					css: {
-						transformed: result.code.toString("utf8"),
-						sourcemap,
-					},
-					js: {
+					code,
+					codeBuffer,
+					transformResult: {
 						moduleType: "js",
-						code: isModule
-							? `export default ${JSON.stringify(getClassMap(result.exports))};`
-							: "export {};",
+						code: jsCode,
 					},
 				});
 
-				return chunk.js;
+				return chunk.transformResult;
 			},
 		},
-		renderStart(_outputOptions, inputOptions) {
-			cwd = inputOptions.cwd ?? process.cwd();
-		},
 		generateBundle(outputOptions, bundleMap) {
-			const baseDir = path.resolve(cwd, outputOptions.dir);
+			const baseDir = path.resolve(root, outputOptions.dir);
 			const baseUrl = outputOptions.sourcemapBaseUrl ? new URL(outputOptions.sourcemapBaseUrl) : null;
 			Object
 				.values(bundleMap)
 				.filter(bundle => bundle.type === "chunk")
 				.forEach(bundle => {
-					// generate merged CSS chunk
+					const sourcemapEnabled = outputOptions.sourcemap ?? false;
 					const fileName = `${path.parse(bundle.fileName).name}.css`;
+
+					// generate merged CSS chunk
 					const chunks = bundle.moduleIds
 						.map(moduleId => chunkMap.get(moduleId))
-						.filter(Boolean);
+						.filter(Boolean)
+						.map(chunk => {
+							const result = transform({
+								...lightningCssConfig,
+								filename: chunk.moduleId,
+								code: chunk.codeBuffer,
+								projectRoot: root,
+								minify: Boolean(outputOptions.minify),
+								sourceMap: sourcemapEnabled,
+							});
 
-					let code = chunks.map(chunk => chunk.css.transformed).join("\n");
+							// forward warnings to Rollup
+							for (const warning of result.warnings) {
+								this.warn({
+									code: warning.type,
+									message: warning.message,
+									loc: {
+										column: warning.loc.column,
+										line: warning.loc.line,
+										file: warning.loc.filename,
+									},
+								});
+							}
 
-					// if enabled, also generate merged sourcemap
-					if (outputOptions.sourcemap && sourcemapEnabled) {
+							// get sourcemap if enabled
+							let mappings = null;
+							if (sourcemapEnabled) {
+								try {
+									const sourcemap = JSON.parse(result.map.toString("utf8"));
+									if (sourcemap?.version !== 3) {
+										throw new Error("expected sourcemap version 3");
+									}
+
+									mappings = sourcemap.mappings ?? "";
+								}
+								catch (ex) {
+									this.warn({
+										code: "E_SOURCEMAP",
+										message: `failed to parse sourcemap, ${ex.message}`,
+									});
+								}
+							}
+
+							return {
+								moduleId: chunk.moduleId,
+								originalCode: chunk.code,
+								transformedCode: result.code.toString("utf8"),
+								mappings,
+							};
+						});
+
+					// merge CSS code
+					let code = chunks.map(chunk => chunk.transformedCode).join("\n");
+
+					// merge source mappings if enabled
+					if (sourcemapEnabled) {
 						const sourcemap = {
 							version: 3,
-							sources: chunks.map(chunk => normalizePath(path.relative(baseDir, chunk.moduleId))),
-							sourcesContent: chunks.map(() => null),
+							sources: chunks.map(chunk => normalRelativePath(baseDir, chunk.moduleId)),
+							sourcesContent: chunks.map(chunk => chunk.originalCode),
 							names: [],
 							mappings: chunks
-								.map((chunk, sourceIndex) => replaceSourceIndex(chunk.css.sourcemap.mappings, sourceIndex))
+								.map((chunk, sourceIndex) => replaceSourceIndex(chunk.mappings, sourceIndex))
 								.join(";"),
 						};
 
+						// emit sourcemap chunk
 						const sourcemapFileName = `${fileName}.map`;
 						this.emitFile({
 							type: "prebuilt-chunk",
@@ -143,6 +174,7 @@ export default function LightningCssPlugin(pluginOptions) {
 						code += `\n/*# sourceMappingURL=${baseUrl ? new URL(sourcemapFileName, baseUrl) : sourcemapFileName} */`;
 					}
 
+					// emit CSS chunk
 					this.emitFile({
 						type: "prebuilt-chunk",
 						fileName,
@@ -150,18 +182,22 @@ export default function LightningCssPlugin(pluginOptions) {
 					});
 				});
 
+			// reset cache
 			chunkMap.clear();
 		}
 	};
 }
 
+function normalRelativePath(from, to) {
+	const relative = path.relative(from, to).replace(/\\/g, "/");
+	return path.posix.normalize(relative);
+}
+
 const VLQ_ENCODE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 const VLQ_DECODE = Array.prototype.reduce.call(VLQ_ENCODE, (map, char, id) => (map[char] = id, map), {});
 
-/**
- * quick and dirty source index replacer within a v3 sourcemap string
- * assumes a valid v3 mapping, otherwise the result will likely be mangled
- */
+// source index replacer for v3 sourcemap mappings
+// assumes a valid v3 mapping, otherwise the result will most likely get mangled
 function replaceSourceIndex(mapping, newSourceIndex) {
 	const newSourceIndexVLQ = encodeVLQ(newSourceIndex);
 	const { length } = mapping;
@@ -229,14 +265,4 @@ function encodeVLQ(value) {
 	while (remainder > 0);
 
 	return vlq;
-}
-
-function getClassMap(exports) {
-	return Object
-		.keys(exports)
-		.reduce((map, key) => (map[key] = exports[key].name, map), {});
-}
-
-function normalizePath(value) {
-	return path.posix.normalize(value.replace(/\\/g, "/"));
 }
