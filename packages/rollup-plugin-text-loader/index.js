@@ -6,14 +6,14 @@ const RE_HAS_QUERY_OR_HASH = /^[^?]+\?[^?]*(?:#[^#]*)?$/;
 const RE_TRUE = /^(?:|1|true)$/i;
 
 /**
- * @typedef {Object} TextLoaderOptions
+ * @typedef {Object} TextLoaderPluginOptions
  * @property {string|string[]} [include] path(s) or glob(s) to include
  * @property {string|string[]} [exclude] path(s) or glob(s) to exclude, takes precedence over `include`
  * @property {boolean} [loadRaw=true] whether to handle URL imports, checking for the "raw" query parameter; enabled by default but `include` or `exclude`, if given, take precedence
  */
 
 /**
- * @param {TextLoaderOptions} [pluginOptions]
+ * @param {TextLoaderPluginOptions} [pluginOptions]
  */
 export default function TextLoaderPlugin(pluginOptions) {
 	const resolveId = {

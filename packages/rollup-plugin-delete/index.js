@@ -4,21 +4,21 @@ import * as path from "node:path";
 const PLUGIN_NAME = "Delete";
 
 /**
- * @typedef {Object} DeleteTarget
+ * @typedef {Object} DeletePluginTarget
  * @property {string|string[]} include glob pattern(s) of files to include
  * @property {string|string[]} [exclude] glob pattern(s) to exclude (optional)
  * @property {"before"|"after"} [trigger="before"] when to run the operation (defaults to "before")
  */
 
 /**
- * @typedef {Object} DeleteOptions
- * @property {(string|DeleteTarget)|(string|DeleteTarget)[]} targets desired delete operations
+ * @typedef {Object} DeletePluginOptions
+ * @property {(string|DeletePluginTarget)|(string|DeletePluginTarget)[]} targets desired delete operations
  * @property {boolean} [dryRun=false] whether to perform a dry run, only logging actions without executing them (defaults to false)
  * @property {boolean} [runOnce=true] when in watch mode, controls whether to only delete files on the first build (defaults to true)
  */
 
 /**
- * @param {DeleteOptions} pluginOptions
+ * @param {DeletePluginOptions} pluginOptions
  */
 export default function DeletePlugin(pluginOptions) {
 	const targets = toArray(pluginOptions?.targets ?? []).map(it => typeof it === "string" ? { include: it } : it);

@@ -163,7 +163,7 @@ function onBuild(
 						}
 
 						if (level !== "debug" || context.isDebugging) {
-							const message = `${log.pluginCode ? `[${log.pluginCode}]` : ""}${log.message}`;
+							const message = `${log.pluginCode ? `[${log.pluginCode}] ` : ""}${log.message}`;
 							context.reporter.log(context.moduleName, message, level);
 						}
 					},

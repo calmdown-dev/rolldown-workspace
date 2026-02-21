@@ -27,6 +27,10 @@ const RAW_RUNTIME_STATE =
       "reference": "workspace:packages/rollup-plugin-delete"\
     },\
     {\
+      "name": "@calmdown/rolldown-plugin-lightningcss",\
+      "reference": "workspace:packages/rollup-plugin-lightningcss"\
+    },\
+    {\
       "name": "@calmdown/rolldown-plugin-text-loader",\
       "reference": "workspace:packages/rollup-plugin-text-loader"\
     }\
@@ -37,6 +41,7 @@ const RAW_RUNTIME_STATE =
   "fallbackExclusionList": [\
     ["@calmdown/rolldown-plugin-copy", ["workspace:packages/rollup-plugin-copy"]],\
     ["@calmdown/rolldown-plugin-delete", ["workspace:packages/rollup-plugin-delete"]],\
+    ["@calmdown/rolldown-plugin-lightningcss", ["workspace:packages/rollup-plugin-lightningcss"]],\
     ["@calmdown/rolldown-plugin-text-loader", ["workspace:packages/rollup-plugin-text-loader"]],\
     ["@calmdown/rolldown-workspace", ["workspace:packages/rolldown-workspace"]],\
     ["@calmdown/rollup-workspace-monorepo", ["workspace:."]]\
@@ -122,6 +127,16 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./packages/rollup-plugin-delete/",\
         "packageDependencies": [\
           ["@calmdown/rolldown-plugin-delete", "workspace:packages/rollup-plugin-delete"]\
+        ],\
+        "linkType": "SOFT"\
+      }]\
+    ]],\
+    ["@calmdown/rolldown-plugin-lightningcss", [\
+      ["workspace:packages/rollup-plugin-lightningcss", {\
+        "packageLocation": "./packages/rollup-plugin-lightningcss/",\
+        "packageDependencies": [\
+          ["@calmdown/rolldown-plugin-lightningcss", "workspace:packages/rollup-plugin-lightningcss"],\
+          ["lightningcss", "npm:1.31.1"]\
         ],\
         "linkType": "SOFT"\
       }]\
@@ -452,6 +467,15 @@ const RAW_RUNTIME_STATE =
         "linkType": "HARD"\
       }]\
     ]],\
+    ["detect-libc", [\
+      ["npm:2.1.2", {\
+        "packageLocation": "./.yarn/cache/detect-libc-npm-2.1.2-d0c382b1e2-b736c8d97d.zip/node_modules/detect-libc/",\
+        "packageDependencies": [\
+          ["detect-libc", "npm:2.1.2"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
     ["dts-resolver", [\
       ["npm:2.1.3", {\
         "packageLocation": "./.yarn/cache/dts-resolver-npm-2.1.3-5deb33a062-9dfa79be6f.zip/node_modules/dts-resolver/",\
@@ -499,6 +523,126 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./.yarn/cache/jsesc-npm-3.1.0-2f4f998cd7-20bd37a142.zip/node_modules/jsesc/",\
         "packageDependencies": [\
           ["jsesc", "npm:3.1.0"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["lightningcss", [\
+      ["npm:1.31.1", {\
+        "packageLocation": "./.yarn/cache/lightningcss-npm-1.31.1-c7ba6b60a1-3c2b2c2f64.zip/node_modules/lightningcss/",\
+        "packageDependencies": [\
+          ["detect-libc", "npm:2.1.2"],\
+          ["lightningcss", "npm:1.31.1"],\
+          ["lightningcss-android-arm64", "npm:1.31.1"],\
+          ["lightningcss-darwin-arm64", "npm:1.31.1"],\
+          ["lightningcss-darwin-x64", "npm:1.31.1"],\
+          ["lightningcss-freebsd-x64", "npm:1.31.1"],\
+          ["lightningcss-linux-arm-gnueabihf", "npm:1.31.1"],\
+          ["lightningcss-linux-arm64-gnu", "npm:1.31.1"],\
+          ["lightningcss-linux-arm64-musl", "npm:1.31.1"],\
+          ["lightningcss-linux-x64-gnu", "npm:1.31.1"],\
+          ["lightningcss-linux-x64-musl", "npm:1.31.1"],\
+          ["lightningcss-win32-arm64-msvc", "npm:1.31.1"],\
+          ["lightningcss-win32-x64-msvc", "npm:1.31.1"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["lightningcss-android-arm64", [\
+      ["npm:1.31.1", {\
+        "packageLocation": "./.yarn/unplugged/lightningcss-android-arm64-npm-1.31.1-c9177db6a5/node_modules/lightningcss-android-arm64/",\
+        "packageDependencies": [\
+          ["lightningcss-android-arm64", "npm:1.31.1"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["lightningcss-darwin-arm64", [\
+      ["npm:1.31.1", {\
+        "packageLocation": "./.yarn/unplugged/lightningcss-darwin-arm64-npm-1.31.1-91e93998a3/node_modules/lightningcss-darwin-arm64/",\
+        "packageDependencies": [\
+          ["lightningcss-darwin-arm64", "npm:1.31.1"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["lightningcss-darwin-x64", [\
+      ["npm:1.31.1", {\
+        "packageLocation": "./.yarn/unplugged/lightningcss-darwin-x64-npm-1.31.1-2fbb706484/node_modules/lightningcss-darwin-x64/",\
+        "packageDependencies": [\
+          ["lightningcss-darwin-x64", "npm:1.31.1"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["lightningcss-freebsd-x64", [\
+      ["npm:1.31.1", {\
+        "packageLocation": "./.yarn/unplugged/lightningcss-freebsd-x64-npm-1.31.1-b7a6df758d/node_modules/lightningcss-freebsd-x64/",\
+        "packageDependencies": [\
+          ["lightningcss-freebsd-x64", "npm:1.31.1"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["lightningcss-linux-arm-gnueabihf", [\
+      ["npm:1.31.1", {\
+        "packageLocation": "./.yarn/unplugged/lightningcss-linux-arm-gnueabihf-npm-1.31.1-acfdb356f1/node_modules/lightningcss-linux-arm-gnueabihf/",\
+        "packageDependencies": [\
+          ["lightningcss-linux-arm-gnueabihf", "npm:1.31.1"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["lightningcss-linux-arm64-gnu", [\
+      ["npm:1.31.1", {\
+        "packageLocation": "./.yarn/unplugged/lightningcss-linux-arm64-gnu-npm-1.31.1-d2b2a51507/node_modules/lightningcss-linux-arm64-gnu/",\
+        "packageDependencies": [\
+          ["lightningcss-linux-arm64-gnu", "npm:1.31.1"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["lightningcss-linux-arm64-musl", [\
+      ["npm:1.31.1", {\
+        "packageLocation": "./.yarn/unplugged/lightningcss-linux-arm64-musl-npm-1.31.1-56143e5c53/node_modules/lightningcss-linux-arm64-musl/",\
+        "packageDependencies": [\
+          ["lightningcss-linux-arm64-musl", "npm:1.31.1"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["lightningcss-linux-x64-gnu", [\
+      ["npm:1.31.1", {\
+        "packageLocation": "./.yarn/unplugged/lightningcss-linux-x64-gnu-npm-1.31.1-30ef619c3b/node_modules/lightningcss-linux-x64-gnu/",\
+        "packageDependencies": [\
+          ["lightningcss-linux-x64-gnu", "npm:1.31.1"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["lightningcss-linux-x64-musl", [\
+      ["npm:1.31.1", {\
+        "packageLocation": "./.yarn/unplugged/lightningcss-linux-x64-musl-npm-1.31.1-b488230d52/node_modules/lightningcss-linux-x64-musl/",\
+        "packageDependencies": [\
+          ["lightningcss-linux-x64-musl", "npm:1.31.1"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["lightningcss-win32-arm64-msvc", [\
+      ["npm:1.31.1", {\
+        "packageLocation": "./.yarn/unplugged/lightningcss-win32-arm64-msvc-npm-1.31.1-80cf445113/node_modules/lightningcss-win32-arm64-msvc/",\
+        "packageDependencies": [\
+          ["lightningcss-win32-arm64-msvc", "npm:1.31.1"]\
+        ],\
+        "linkType": "HARD"\
+      }]\
+    ]],\
+    ["lightningcss-win32-x64-msvc", [\
+      ["npm:1.31.1", {\
+        "packageLocation": "./.yarn/unplugged/lightningcss-win32-x64-msvc-npm-1.31.1-a9ecf768ba/node_modules/lightningcss-win32-x64-msvc/",\
+        "packageDependencies": [\
+          ["lightningcss-win32-x64-msvc", "npm:1.31.1"]\
         ],\
         "linkType": "HARD"\
       }]\

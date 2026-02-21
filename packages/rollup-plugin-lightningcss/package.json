@@ -1,0 +1,17 @@
+{
+	"name": "@calmdown/rolldown-plugin-lightningcss",
+	"version": "1.0.0",
+	"license": "ISC",
+	"type": "module",
+	"exports": {
+		".": {
+			"import": "./index.js"
+		}
+	},
+	"peerDependencies": {
+		"lightningcss": ">=1.31.1"
+	},
+	"devDependencies": {
+		"lightningcss": "1.31.1"
+	}
+}

@@ -8,25 +8,37 @@ const SL_COPY_FILE = "copy-file";
 const SL_LINK_ABSOLUTE = "link-absolute";
 const SL_LINK_RELATIVE = "link-relative";
 
+const EK_FILE = "file";
+const EK_LINK = "link";
+const EK_UNKNOWN = "unknown";
+
 /**
- * @typedef {Object} CopyTarget
- * @property {string} destination where files should be copied or linked
+ * @typedef {Object} CopySingleTarget
+ * @property {string} srcFile path to the file to be copied
+ * @property {string} dstFile path to where the file should be copied to
  * @property {string} [baseDir] base directory for relative paths (defaults to current directory)
- * @property {string|string[]} include glob pattern(s) of files to include
- * @property {string|string[]} [exclude] glob pattern(s) to exclude (optional)
  * @property {"before"|"after"} [trigger="after"] when to run the operation (defaults to "after")
  */
 
 /**
- * @typedef {Object} CopyOptions
- * @property {CopyTarget[]} targets desired copy/link operations
+ * @typedef {Object} CopyManyTarget
+ * @property {string} dstDir directory to where files should be copied or linked
+ * @property {string|string[]} include glob pattern(s) of files to include
+ * @property {string|string[]} [exclude] glob pattern(s) to exclude (optional)
+ * @property {string} [baseDir] base directory for relative paths (defaults to current directory)
+ * @property {"before"|"after"} [trigger="after"] when to run the operation (defaults to "after")
+ */
+
+/**
+ * @typedef {Object} CopyPluginOptions
+ * @property {(CopySingleTarget | CopyManyTarget)[]} targets desired copy/link operations
  * @property {boolean} [dryRun=false] whether to perform a dry run, only logging actions without executing them (defaults to false)
  * @property {boolean} [runOnce=true] when in watch mode, controls whether to only delete files on the first build (defaults to true)
  * @property {"ignore"|"copy-file"|"link-absolute"|"link-relative"} [symLinks="ignore"] how to handle symlinks (defaults to "ignore")
  */
 
 /**
- * @param {CopyOptions} pluginOptions
+ * @param {CopyPluginOptions} pluginOptions
  */
 export default function CopyPlugin(pluginOptions) {
 	const targets = pluginOptions?.targets ?? [];
@@ -47,36 +59,48 @@ export default function CopyPlugin(pluginOptions) {
 	};
 
 	const execTarget = async (context, cwd, target) => {
-		const include = toArray(target.include);
-		const globOptions = {
-			cwd,
-			exclude: toArray(target.exclude ?? []),
-			withFileTypes: true,
-		};
-
+		const baseDir = target.baseDir ? path.resolve(cwd, target.baseDir) : cwd;
 		const entries = [];
-		for (const includePattern of include) {
-			for await (const entry of fs.glob(includePattern, globOptions)) {
-				entries.push(entry);
+		if (target.srcFile) {
+			// single file
+			const src = path.resolve(baseDir, target.srcFile);
+			const stats = await fs.stat(src);
+			entries.push({
+				src,
+				dst: path.resolve(baseDir, target.dstFile),
+				kind: getKind(stats),
+			});
+		}
+		else {
+			// many files
+			const include = toArray(target.include);
+			const globOptions = {
+				cwd,
+				exclude: toArray(target.exclude ?? []),
+				withFileTypes: true,
+			};
+
+			const dstDir = path.resolve(baseDir, target.dstDir);
+			for (const includePattern of include) {
+				for await (const entry of fs.glob(includePattern, globOptions)) {
+					entries.push({
+						src: path.join(entry.parentPath, entry.name),
+						dst: path.join(dstDir, entry.name),
+						kind: getKind(entry),
+					});
+				}
 			}
 		}
 
-		const baseDir = target.baseDir ? path.join(cwd, target.baseDir) : null;
 		for (const entry of entries) {
-			const srcPath = path.join(entry.parentPath, entry.name);
-			const dstDir = baseDir
-				? path.join(cwd, target.destination, path.relative(baseDir, path.dirname(srcPath)))
-				: path.join(cwd, target.destination);
-
-			const dstPath = path.join(dstDir, entry.name);
-
-			if (entry.isFile()) {
+			const dstDir = path.dirname(entry.dst);
+			if (entry.kind === EK_FILE) {
 				await exec(context, null, () => fs.mkdir(dstDir, { recursive: true }));
-				await exec(context, `would copy file ${srcPath} -> ${dstPath}`, () => fs.copyFile(srcPath, dstPath));
-				context.addWatchFile(srcPath);
+				await exec(context, `would copy file ${entry.src} -> ${entry.dst}`, () => fs.copyFile(entry.src, entry.dst));
+				context.addWatchFile(entry.src);
 			}
-			else if (entry.isSymbolicLink() && symLinks !== SL_IGNORE) {
-				const linkedPath = await resolveSymLink(srcPath);
+			else if (entry.kind === EK_LINK && symLinks !== SL_IGNORE) {
+				const linkedPath = await resolveSymLink(entry.src);
 				if (!linkedPath) {
 					continue;
 				}
@@ -84,16 +108,16 @@ export default function CopyPlugin(pluginOptions) {
 				await exec(context, null, () => fs.mkdir(dstDir, { recursive: true }));
 				switch (symLinks) {
 					case SL_COPY_FILE:
-						await exec(context, `would copy file ${linkedPath} -> ${dstPath} resolved from symlink ${srcPath}`, () => fs.copyFile(linkedPath, dstPath));
+						await exec(context, `would copy file ${linkedPath} -> ${entry.dst} resolved from symlink ${entry.src}`, () => fs.copyFile(linkedPath, entry.dst));
 						break;
 
 					case SL_LINK_ABSOLUTE:
-						await exec(context, `would create symlink ${dstPath} pointing to ${linkedPath} resolved from symlink ${srcPath}`, () => fs.symlink(linkedPath, dstPath));
+						await exec(context, `would create symlink ${entry.dst} pointing to ${linkedPath} resolved from symlink ${entry.src}`, () => fs.symlink(linkedPath, entry.dst));
 						break;
 
 					case SL_LINK_RELATIVE: {
-						const linkTargetPath = path.relative(dstPath, linkedPath);
-						await exec(context, `would create symlink ${dstPath} pointing to ${linkTargetPath} resolved from symlink ${srcPath}`, () => fs.symlink(linkTargetPath, dstPath));
+						const linkTargetPath = path.relative(entry.dst, linkedPath);
+						await exec(context, `would create symlink ${entry.dst} pointing to ${linkTargetPath} resolved from symlink ${entry.src}`, () => fs.symlink(linkTargetPath, entry.dst));
 						break;
 					}
 				}
@@ -139,6 +163,18 @@ export default function CopyPlugin(pluginOptions) {
 
 function toArray(oneOrMore) {
 	return Array.isArray(oneOrMore) ? oneOrMore : [ oneOrMore ];
+}
+
+function getKind(entry) {
+	if (entry.isFile()) {
+		return EK_FILE;
+	}
+
+	if (entry.isSymbolicLink()) {
+		return EK_LINK;
+	}
+
+	return EK_UNKNOWN;
 }
 
 async function resolveSymLink(linkPath, maxDepth = 8) {
