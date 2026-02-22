@@ -16,7 +16,7 @@ export type PluginDefinition<TName extends string, TConfig extends object> = Ent
 }>;
 
 export interface PluginLoader<TConfig extends object> {
-	(context: BuildContext): Promise<(config: TConfig) => Plugin>;
+	(context: BuildContext): Promise<(config?: TConfig) => Plugin>;
 }
 
 export type AnyPluginDeclaration = (

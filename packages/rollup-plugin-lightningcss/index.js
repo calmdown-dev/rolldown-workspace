@@ -14,7 +14,7 @@ const RE_MODULE = /\.module\.css$/i;
  */
 
 /**
- * @param {LightningCssPluginOptions} pluginOptions
+ * @param {LightningCssPluginOptions} [pluginOptions]
  */
 export default function LightningCssPlugin(pluginOptions) {
 	const lightningCssConfig = {
