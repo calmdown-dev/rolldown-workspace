@@ -8,10 +8,13 @@
 			"import": "./index.js"
 		}
 	},
+	"files": [
+		"index.js"
+	],
 	"peerDependencies": {
-		"lightningcss": ">=1.31.1"
+		"lightningcss": ">=1.32.0"
 	},
 	"devDependencies": {
-		"lightningcss": "1.31.1"
+		"lightningcss": "1.32.0"
 	}
 }
