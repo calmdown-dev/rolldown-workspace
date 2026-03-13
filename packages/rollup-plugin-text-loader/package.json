@@ -1,5 +1,5 @@
 {
-	"name": "@calmdown/rolldown-plugin-text-loader",
+	"name": "@calmdown/rollup-plugin-text-loader",
 	"version": "1.0.0",
 	"license": "ISC",
 	"type": "module",

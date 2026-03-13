@@ -1,5 +1,5 @@
 {
-	"name": "@calmdown/rolldown-plugin-lightningcss",
+	"name": "@calmdown/rollup-plugin-lightningcss",
 	"version": "1.0.0",
 	"license": "ISC",
 	"type": "module",
