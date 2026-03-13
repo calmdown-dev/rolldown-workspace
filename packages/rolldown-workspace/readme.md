@@ -94,12 +94,12 @@ export const Declarations = definePlugin(
 );
 ```
 
-Then, define common build targets in `targets.mjs`. E.g.:
+Then, define common build targets in `targets.js`. E.g.:
 
 ```js
 import { defineTarget, Env, inEnv } from "@calmdown/rolldown-workspace";
 
-import * as Plugin from "./plugins.mjs";
+import * as Plugin from "./plugins.js";
 
 export const TypeScriptLibrary = defineTarget("TypeScriptLibrary", target => target
   .configure({
@@ -123,7 +123,7 @@ export const TypeScriptLibrary = defineTarget("TypeScriptLibrary", target => tar
 // ...
 ```
 
-Finally add the build command script in `build.mjs`. The build function comes
+Finally add the build command script in `build.js`. The build function comes
 with sensible defaults out of the box, however it is recommended to set at least
 the `jail` directory to constrain all lookups to stay within the monorepo.
 
@@ -139,7 +139,7 @@ await build({ jail });
 ### Other Packages
 
 With this setup, any package that needs a Rolldown build can now do so simply by
-adding a dev dependency on `build-logic` and adding a `build.config.mjs` script:
+adding a dev dependency on `build-logic` and adding a `build.config.js` script:
 
 ```json
 {
