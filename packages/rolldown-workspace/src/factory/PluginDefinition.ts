@@ -19,7 +19,7 @@ export interface PluginLoader<TConfig extends object> {
 	(context: BuildContext): Promise<(config?: TConfig) => Plugin>;
 }
 
-export type AnyPluginDeclaration = (
+export type AnyPluginDefinition = (
 	PluginDefinition<any, any>
 );
 
@@ -35,9 +35,9 @@ export function definePlugin<TName extends string, TConfig extends object>(
 }
 
 function onSuppress(
-	this: AnyPluginDeclaration,
+	this: AnyPluginDefinition,
 	code: string,
-): AnyPluginDeclaration {
+): AnyPluginDefinition {
 	this.suppressions.add(code);
 	return this;
 }

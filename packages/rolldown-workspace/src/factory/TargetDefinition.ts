@@ -2,15 +2,15 @@ import type { OutputOptions, Plugin } from "rolldown";
 
 import { Builder } from "~/build/Builder";
 
-import type { BuildContext, BuildTarget, InputConfig, LogSuppression } from "./common";
+import { setContext, type BuildContext, type BuildTarget, type InputConfig, type LogSuppression } from "./common";
 import { createEntity, type AnyEntity, type Entity, type NameOf } from "./Entity";
 import { createEntityContainer, type EntityContainer, type EntityMap } from "./EntityContainer";
-import { definePipeline, type AnyPipelineDeclaration, type PipelineDefinition } from "./PipelineDefinition";
-import type { AnyPluginDeclaration } from "./PluginDefinition";
+import { definePipeline, type AnyPipelineDefinition, type PipelineDefinition } from "./PipelineDefinition";
+import type { AnyPluginDefinition } from "./PluginDefinition";
 
 export type TargetDefinition<
 	TName extends string,
-	TPipelines extends EntityMap<AnyPipelineDeclaration>,
+	TPipelines extends EntityMap<AnyPipelineDefinition>,
 > = Entity<TName, InputConfig, {
 	readonly pipelines: TPipelines;
 
@@ -18,7 +18,7 @@ export type TargetDefinition<
 	readonly entries?: { [K in string]: string };
 
 	/** @internal */
-	readonly pipelineContainer: EntityContainer<AnyPipelineDeclaration, TPipelines>;
+	readonly pipelineContainer: EntityContainer<AnyPipelineDefinition, TPipelines>;
 
 	/** @internal */
 	entry(
@@ -26,7 +26,7 @@ export type TargetDefinition<
 		entryPath: string,
 	): Target<TName, TPipelines>;
 
-	pipeline<TPipelineName extends string, TPipeline extends AnyPipelineDeclaration>(
+	pipeline<TPipelineName extends string, TPipeline extends AnyPipelineDefinition>(
 		name: TPipelineName,
 		block: (pipeline: PipelineDefinition<TPipelineName, {}, {}>) => TPipeline,
 	): TargetDefinition<TName, TPipelines & { [K in NameOf<TPipeline>]: TPipeline }>;
@@ -36,11 +36,11 @@ export type TargetDefinition<
 	): void;
 }>;
 
-export type AnyTargetDeclaration = TargetDefinition<any, any>;
+export type AnyTargetDefinition = TargetDefinition<any, any>;
 
 export type Target<
 	TName extends string,
-	TPipelines extends EntityMap<AnyPipelineDeclaration>,
+	TPipelines extends EntityMap<AnyPipelineDefinition>,
 > = Omit<TargetDefinition<TName, TPipelines>, "pipeline" | "override" | "build"> & {
 	entry(
 		unit: string,
@@ -50,11 +50,11 @@ export type Target<
 
 export type AnyTarget = Target<any, any>;
 
-export function defineTarget<TName extends string, TTarget extends AnyTargetDeclaration>(
+export function defineTarget<TName extends string, TTarget extends AnyTargetDefinition>(
 	name: TName,
 	block: (target: TargetDefinition<TName, {}>) => TTarget,
 ): TTarget {
-	const pipelineContainer = createEntityContainer<AnyPipelineDeclaration>("Pipeline");
+	const pipelineContainer = createEntityContainer<AnyPipelineDefinition>("Pipeline");
 	return block(
 		createEntity(name, {
 			pipelines: pipelineContainer.entityMap,
@@ -68,8 +68,8 @@ export function defineTarget<TName extends string, TTarget extends AnyTargetDecl
 }
 
 function onFinalize(
-	this: AnyTargetDeclaration,
-): AnyTargetDeclaration {
+	this: AnyTargetDefinition,
+): AnyTargetDefinition {
 	const pipelineContainer = this.pipelineContainer.finalize();
 	return {
 		...this,
@@ -81,10 +81,10 @@ function onFinalize(
 }
 
 function onEntry(
-	this: AnyTargetDeclaration,
+	this: AnyTargetDefinition,
 	unit: string,
 	entryPath: string,
-): AnyTargetDeclaration {
+): AnyTargetDefinition {
 	if (!this.isFinal) {
 		throw new Error("Cannot add entries to an unfinalized Target.");
 	}
@@ -94,10 +94,10 @@ function onEntry(
 }
 
 function onPipeline(
-	this: AnyTargetDeclaration,
+	this: AnyTargetDefinition,
 	name: string,
-	block: (pipeline: AnyPipelineDeclaration) => AnyPipelineDeclaration,
-): AnyTargetDeclaration {
+	block: (pipeline: AnyPipelineDefinition) => AnyPipelineDefinition,
+): AnyTargetDefinition {
 	const pipeline = block(definePipeline(name));
 	if (this.isFinal) {
 		this.pipelineContainer.add(pipeline);
@@ -113,11 +113,12 @@ function onPipeline(
 }
 
 function onBuild(
-	this: AnyTargetDeclaration,
+	this: AnyTargetDefinition,
 	block: (target: AnyTarget, context: BuildContext) => void,
 ): void {
 	const target = this.finalize();
 	Builder.addBuildTask(async context => {
+		setContext(context);
 		block(target, context);
 		if (!hasEntries(target) || await isDisabled(target, context)) {
 			return [];
@@ -174,7 +175,7 @@ function onBuild(
 }
 
 function hasEntries(
-	target: AnyTargetDeclaration,
+	target: AnyTargetDefinition,
 ): boolean {
 	return !!target.entries && Object.keys(target.entries).length > 0;
 }
@@ -187,7 +188,7 @@ async function isDisabled(
 }
 
 function collectPlugins(
-	container: EntityContainer<AnyPluginDeclaration>,
+	container: EntityContainer<AnyPluginDefinition>,
 	context: BuildContext,
 	suppressions: LogSuppression[],
 ): Promise<Plugin[]> {

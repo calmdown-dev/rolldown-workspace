@@ -1,31 +1,31 @@
 import type { InputConfig } from "./common";
 import { createEntity, type Entity, type NameOf } from "./Entity";
 import { createEntityContainer, type EntityContainer, type EntityMap } from "./EntityContainer";
-import { defineOutput, type AnyOutputDeclaration, type OutputDefinition } from "./OutputDefinition";
-import type { AnyPluginDeclaration } from "./PluginDefinition";
+import { defineOutput, type AnyOutputDefinition, type OutputDefinition } from "./OutputDefinition";
+import type { AnyPluginDefinition } from "./PluginDefinition";
 
 export type PipelineDefinition<
 	TName extends string,
-	TPlugins extends EntityMap<AnyPluginDeclaration>,
-	TOutputs extends EntityMap<AnyOutputDeclaration>,
+	TPlugins extends EntityMap<AnyPluginDefinition>,
+	TOutputs extends EntityMap<AnyOutputDefinition>,
 > = Entity<TName, InputConfig, {
 	readonly plugins: TPlugins;
 	readonly outputs: TOutputs;
 
 	/** @internal */
-	readonly pluginContainer: EntityContainer<AnyPluginDeclaration, TPlugins>;
+	readonly pluginContainer: EntityContainer<AnyPluginDefinition, TPlugins>;
 
 	/** @internal */
-	readonly outputContainer: EntityContainer<AnyOutputDeclaration, TOutputs>;
+	readonly outputContainer: EntityContainer<AnyOutputDefinition, TOutputs>;
 
 	/** @internal */
 	readonly suppressions: Set<string>;
 
-	plugin<TPlugin extends AnyPluginDeclaration>(
+	plugin<TPlugin extends AnyPluginDefinition>(
 		plugin: TPlugin,
 	): PipelineDefinition<TName, TPlugins & { [K in NameOf<TPlugin>]: TPlugin }, TOutputs>;
 
-	output<TOutputName extends string, TOutput extends AnyOutputDeclaration>(
+	output<TOutputName extends string, TOutput extends AnyOutputDefinition>(
 		name: TOutputName,
 		block?: (output: OutputDefinition<TOutputName, {}>) => TOutput,
 	): PipelineDefinition<TName, TPlugins, TOutputs & { [K in NameOf<TOutput>]: TOutput }>;
@@ -35,13 +35,13 @@ export type PipelineDefinition<
 	): PipelineDefinition<TName, TPlugins, TOutputs>;
 }>;
 
-export type AnyPipelineDeclaration = PipelineDefinition<any, any, any>;
+export type AnyPipelineDefinition = PipelineDefinition<any, any, any>;
 
 export function definePipeline<TName extends string>(
 	name: TName,
 ): PipelineDefinition<TName, {}, {}> {
-	const pluginContainer = createEntityContainer<AnyPluginDeclaration>("Plugin");
-	const outputContainer = createEntityContainer<AnyOutputDeclaration>("Output");
+	const pluginContainer = createEntityContainer<AnyPluginDefinition>("Plugin");
+	const outputContainer = createEntityContainer<AnyOutputDefinition>("Output");
 	return createEntity(name, {
 		plugins: pluginContainer.entityMap,
 		outputs: outputContainer.entityMap,
@@ -56,8 +56,8 @@ export function definePipeline<TName extends string>(
 }
 
 function onFinalize(
-	this: AnyPipelineDeclaration,
-): AnyPipelineDeclaration {
+	this: AnyPipelineDefinition,
+): AnyPipelineDefinition {
 	const pluginContainer = this.pluginContainer.finalize();
 	const outputContainer = this.outputContainer.finalize();
 	return {
@@ -71,9 +71,9 @@ function onFinalize(
 }
 
 function onPlugin(
-	this: AnyPipelineDeclaration,
-	plugin: AnyPluginDeclaration,
-): AnyPipelineDeclaration {
+	this: AnyPipelineDefinition,
+	plugin: AnyPluginDefinition,
+): AnyPipelineDefinition {
 	if (this.isFinal) {
 		this.pluginContainer.add(plugin);
 		return this;
@@ -88,10 +88,10 @@ function onPlugin(
 }
 
 function onOutput(
-	this: AnyPipelineDeclaration,
+	this: AnyPipelineDefinition,
 	name: string,
-	block?: (output: AnyOutputDeclaration) => AnyOutputDeclaration,
-): AnyPipelineDeclaration {
+	block?: (output: AnyOutputDefinition) => AnyOutputDefinition,
+): AnyPipelineDefinition {
 	const output = block
 		? block(defineOutput(name))
 		: defineOutput(name);
@@ -110,9 +110,9 @@ function onOutput(
 }
 
 function onSuppress(
-	this: AnyPipelineDeclaration,
+	this: AnyPipelineDefinition,
 	code: string,
-): AnyPipelineDeclaration {
+): AnyPipelineDefinition {
 	this.suppressions.add(code);
 	return this;
 }

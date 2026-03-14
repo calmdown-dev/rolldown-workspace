@@ -37,18 +37,23 @@ export enum Env {
 	Production = "prod",
 }
 
+
+let currentContext!: BuildContext;
+
+export function setContext(context: BuildContext) {
+	currentContext = context;
+}
+
+
 interface UtilityConfigurator {
-	(context: BuildContext): boolean;
+	(context?: BuildContext): boolean;
 	(current: boolean, context: BuildContext): boolean;
 }
 
-function utilityConfigurator<TArgs extends any[]>(
-	block: (context: BuildContext, ...args: TArgs) => boolean,
-	...args: TArgs
-): UtilityConfigurator {
-	return (arg0: BuildContext | boolean, arg1?: BuildContext) => {
-		const context = typeof arg0 === "boolean" ? arg1! : arg0;
-		return block(context, ...args);
+function utilityConfigurator(block: (context: BuildContext) => boolean): UtilityConfigurator {
+	return (arg0: BuildContext | boolean | undefined, arg1?: BuildContext) => {
+		const context = typeof arg0 === "boolean" ? arg1! : arg0 ?? currentContext;
+		return block(context);
 	};
 }
 

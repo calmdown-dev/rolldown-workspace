@@ -1,5 +1,94 @@
-export * from "./build";
-export * from "./cli";
-export * from "./factory";
-export * from "./workspace";
-export * from "./FileSystem";
+export {
+	activity,
+	build,
+	Builder,
+	deferred,
+	Dispatcher,
+	type Activity,
+	type BuildCall,
+	type BuildOptions,
+	type CompletableDeferred,
+	type Deferred,
+	type WatchResult,
+} from "./build";
+
+export {
+	buildCommand,
+	formatTime,
+	NoOpReporter,
+	overrideConsole,
+	parseArgs,
+	restoreConsole,
+	StreamReporter,
+	type ArgumentInfo,
+	type BooleanOptionSetup,
+	type Command,
+	type CommandBuilder,
+	type CommandBuilderWithArgs,
+	type LogLevel,
+	type MultiValueOptionSetup,
+	type OptionalArgumentSetup,
+	type OptionInfo,
+	type ParsedCommand,
+	type Reporter,
+	type RequiredArgumentSetup,
+	type StatusKind,
+	type ValueOptionSetup,
+} from "./cli";
+
+export {
+	defineOutput,
+	definePipeline,
+	definePlugin,
+	defineTarget,
+	Env,
+	inDebugMode,
+	inDevelopment,
+	inEnv,
+	inProduction,
+	inStaging,
+	inWatchMode,
+	type AnyEntity,
+	type AnyOutputDefinition,
+	type AnyPipelineDefinition,
+	type AnyPluginDefinition,
+	type AnyTarget,
+	type AnyTargetDefinition,
+	type BuildContext,
+	type BuildTarget,
+	type ConfigOf,
+	type Configurator,
+	type ConfiguratorContext,
+	type Entity,
+	type EntityContainer,
+	type EntityMap,
+	type InputConfig,
+	type NameOf,
+	type OutputConfig,
+	type OutputDefinition,
+	type PipelineDefinition,
+	type PluginDefinition,
+	type PluginLoader,
+	type Target,
+	type TargetDefinition,
+} from "./factory";
+
+export {
+	DependencyKind,
+	Package,
+	Workspace,
+	type DependencyMap,
+	type DiscoverPackageOptions,
+	type DiscoverWorkspaceOptions,
+	type DiscoverWorkspaceResult,
+	type PackageDeclaration,
+} from "./workspace";
+
+export {
+	AbortError,
+} from "./AbortError";
+
+export type {
+	FileSystem,
+	GlobOptions,
+} from "./FileSystem";

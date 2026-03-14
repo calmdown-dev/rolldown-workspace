@@ -7,7 +7,7 @@ import type { Package } from "~/workspace";
 import { formatTime } from "./common";
 import type { LogLevel, Reporter, StatusKind } from "./Reporter";
 
-export interface PackageInfo {
+interface PackageInfo {
 	readonly pkg: Package;
 	status: StatusKind;
 	buildStartTime: number;
@@ -245,5 +245,3 @@ export class StreamReporter implements Reporter {
 		return { lineCount, output };
 	}
 }
-
-
