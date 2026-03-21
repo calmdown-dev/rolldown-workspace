@@ -6,7 +6,7 @@ import { Builder, type BuildCall, type BuildHandle } from "./Builder";
 
 interface PackageEntry {
 	readonly pkg: Package;
-	readonly priority: number;
+	priority: number;
 }
 
 interface TargetEntry {
@@ -115,16 +115,20 @@ export class Dispatcher {
 		call: BuildCall,
 		main: Activity = activity.untilSignal("SIGTERM", "SIGINT"),
 	) {
-		// gather package entries ordered depth-first, also check for dependency cycles
-		const visited = new WeakSet<Package>();
+		// gather package priorities (depth-first), also check for dependency cycles
+		const visited = new Map<Package, number>();
 		const visiting = new WeakSet<Package>();
-		const packageEntires: PackageEntry[] = [];
 
 		let cycleStart: Package | null = null;
 		let cycleInfo = "";
 
-		const visit = (pkg: Package, priority = 0) => {
-			if (visited.has(pkg)) {
+		const visit = (pkg: Package, priority: number) => {
+			const prevPriority = visited.get(pkg);
+			if (prevPriority !== undefined) {
+				if (priority > prevPriority) {
+					visited.set(pkg, priority);
+				}
+
 				return true;
 			}
 
@@ -147,33 +151,31 @@ export class Dispatcher {
 			}
 
 			visiting.delete(pkg);
-			visited.add(pkg);
-			packageEntires.push({ pkg, priority });
+			visited.set(pkg, priority);
 
 			return true;
 		};
 
-		packages.forEach(visit);
+		packages.forEach(pkg => visit(pkg, 0));
 
 		// resolve individual targets
 		const { reporter } = call;
-		for (const entry of packageEntires) {
-			reporter.addPackage(entry.pkg);
-		}
-
 		const targetEntries: TargetEntry[] = [];
-		for (const entry of packageEntires) {
-			const targets = await Builder.getTargets(entry.pkg, call);
-			for (const target of targets) {
-				targetEntries.push({
-					priority: entry.priority,
-					builder: new Builder(entry.pkg, target, reporter),
-				});
+		for (const [ pkg, priority ] of visited.entries()) {
+			reporter.addPackage(pkg);
+
+			const targets = await Builder.getTargets(pkg, call);
+			if (targets.length === 0) {
+				reporter.setStatus(pkg, "SKIP");
+				reporter.setMessage(pkg, pkg.buildConfigPath ? "no targets defined" : "no build config");
+				continue;
 			}
 
-			if (targets.length === 0) {
-				reporter.setStatus(entry.pkg, "SKIP");
-				reporter.setMessage(entry.pkg, entry.pkg.buildConfigPath ? "no targets defined" : "no build config");
+			for (const target of targets) {
+				targetEntries.push({
+					priority,
+					builder: new Builder(pkg, target, reporter),
+				});
 			}
 		}
 
