@@ -1,6 +1,5 @@
 {
 	"compilerOptions": {
-		"baseUrl": "./src",
 		"forceConsistentCasingInFileNames": true,
 		"isolatedModules": true,
 		"lib": [
@@ -9,9 +8,7 @@
 		"module": "ESNext",
 		"moduleResolution": "bundler",
 		"paths": {
-			"~/*": [
-				"*"
-			]
+			"~/*": [ "./src/*" ]
 		},
 		"skipLibCheck": true,
 		"stripInternal": true,
