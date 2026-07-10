@@ -1,11 +1,11 @@
 {
 	"name": "@calmdown/rollup-workspace-monorepo",
 	"private": true,
-	"packageManager": "yarn@4.15.0",
+	"packageManager": "yarn@4.17.1",
 	"workspaces": [
 		"packages/*"
 	],
 	"devDependencies": {
-		"typescript": "5.9.3"
+		"typescript": "6.0.3"
 	}
 }

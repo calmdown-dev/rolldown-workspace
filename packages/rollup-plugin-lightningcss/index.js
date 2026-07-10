@@ -1,4 +1,4 @@
-import * as path from "node:path";
+import * as Path from "node:path";
 
 import { transform } from "lightningcss";
 
@@ -24,12 +24,12 @@ export default function LightningCssPlugin(pluginOptions) {
 
 	const chunkMap = new Map();
 	const modulesEnabled = Boolean(lightningCssConfig.cssModules);
-	let root;
+	let root = process.cwd();
 
 	return {
 		name: PLUGIN_NAME,
 		buildStart(inputOptions) {
-			root = inputOptions.cwd ?? process.cwd();
+			root = Path.resolve(inputOptions.cwd) ?? process.cwd();
 		},
 		transform: {
 			filter: {
@@ -85,14 +85,14 @@ export default function LightningCssPlugin(pluginOptions) {
 			},
 		},
 		generateBundle(outputOptions, bundleMap) {
-			const baseDir = path.resolve(root, outputOptions.dir);
+			const baseDir = Path.resolve(root, outputOptions.dir);
 			const baseUrl = outputOptions.sourcemapBaseUrl ? new URL(outputOptions.sourcemapBaseUrl) : null;
 			Object
 				.values(bundleMap)
 				.filter(bundle => bundle.type === "chunk")
 				.forEach(bundle => {
 					const sourcemapEnabled = outputOptions.sourcemap ?? false;
-					const fileName = `${path.parse(bundle.fileName).name}.css`;
+					const fileName = `${Path.parse(bundle.fileName).name}.css`;
 
 					// generate merged CSS chunk
 					const chunks = bundle.moduleIds
@@ -189,8 +189,8 @@ export default function LightningCssPlugin(pluginOptions) {
 }
 
 function normalRelativePath(from, to) {
-	const relative = path.relative(from, to).replace(/\\/g, "/");
-	return path.posix.normalize(relative);
+	const relative = Path.relative(from, to).replace(/\\/g, "/");
+	return Path.posix.normalize(relative);
 }
 
 const VLQ_ENCODE = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

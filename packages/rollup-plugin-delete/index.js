@@ -1,5 +1,5 @@
-import * as fs from "node:fs/promises";
-import * as path from "node:path";
+import * as FS from "node:fs/promises";
+import * as Path from "node:path";
 
 const PLUGIN_NAME = "Delete";
 
@@ -47,23 +47,23 @@ export default function DeletePlugin(pluginOptions) {
 
 		const entries = [];
 		for (const includePattern of include) {
-			for await (const entry of fs.glob(includePattern, globOptions)) {
+			for await (const entry of FS.glob(includePattern, globOptions)) {
 				entries.push(entry);
 			}
 		}
 
 		entries.sort(directoriesLast);
 		for (const entry of entries) {
-			const entryPath = path.join(entry.parentPath, entry.name);
+			const entryPath = Path.join(entry.parentPath, entry.name);
 			if (entry.isFile()) {
-				await exec(context, `would delete file ${entryPath}`, () => fs.unlink(entryPath));
+				await exec(context, `would delete file ${entryPath}`, () => FS.unlink(entryPath));
 			}
 			else if (entry.isSymbolicLink()) {
-				await exec(context, `would delete symlink ${entryPath}`, () => fs.unlink(entryPath));
+				await exec(context, `would delete symlink ${entryPath}`, () => FS.unlink(entryPath));
 			}
 			else if (entry.isDirectory()) {
 				try {
-					await exec(context, `would delete directory ${entryPath}`, () => fs.rmdir(entryPath));
+					await exec(context, `would delete directory ${entryPath}`, () => FS.rmdir(entryPath));
 				}
 				catch (ex) {
 					// ignore errors when directory is not empty
@@ -75,7 +75,6 @@ export default function DeletePlugin(pluginOptions) {
 		}
 	};
 
-	let cwd = undefined;
 	let isFirstBeforeRun = true;
 	let isFirstAfterRun = true;
 	return {
@@ -86,7 +85,8 @@ export default function DeletePlugin(pluginOptions) {
 			}
 
 			isFirstBeforeRun = false;
-			cwd = process.cwd();
+
+			const cwd = process.cwd();
 			for (const target of targets) {
 				const { trigger } = target;
 				if (trigger === "before" || trigger === undefined) {
@@ -100,6 +100,8 @@ export default function DeletePlugin(pluginOptions) {
 			}
 
 			isFirstAfterRun = false;
+
+			const cwd = process.cwd();
 			for (const target of targets) {
 				if (target.trigger === "after") {
 					await execTarget(this, cwd, target);

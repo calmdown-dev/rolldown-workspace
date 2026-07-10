@@ -1,5 +1,5 @@
-import * as fs from "node:fs/promises";
-import * as path from "node:path";
+import * as FS from "node:fs/promises";
+import * as Path from "node:path";
 
 const PLUGIN_NAME = "Copy";
 
@@ -59,15 +59,15 @@ export default function CopyPlugin(pluginOptions) {
 	};
 
 	const execTarget = async (context, cwd, target) => {
-		const baseDir = target.baseDir ? path.resolve(cwd, target.baseDir) : cwd;
+		const baseDir = target.baseDir ? Path.resolve(cwd, target.baseDir) : cwd;
 		const entries = [];
 		if (target.srcFile) {
 			// single file
-			const src = path.resolve(baseDir, target.srcFile);
-			const stats = await fs.stat(src);
+			const src = Path.resolve(baseDir, target.srcFile);
+			const stats = await FS.stat(src);
 			entries.push({
 				src,
-				dst: path.resolve(baseDir, target.dstFile),
+				dst: Path.resolve(baseDir, target.dstFile),
 				kind: getKind(stats),
 			});
 		}
@@ -80,12 +80,12 @@ export default function CopyPlugin(pluginOptions) {
 				withFileTypes: true,
 			};
 
-			const dstDir = path.resolve(baseDir, target.dstDir);
+			const dstDir = Path.resolve(baseDir, target.dstDir);
 			for (const includePattern of include) {
-				for await (const entry of fs.glob(includePattern, globOptions)) {
+				for await (const entry of FS.glob(includePattern, globOptions)) {
 					entries.push({
-						src: path.join(entry.parentPath, entry.name),
-						dst: path.join(dstDir, entry.name),
+						src: Path.join(entry.parentPath, entry.name),
+						dst: Path.join(dstDir, entry.name),
 						kind: getKind(entry),
 					});
 				}
@@ -93,10 +93,10 @@ export default function CopyPlugin(pluginOptions) {
 		}
 
 		for (const entry of entries) {
-			const dstDir = path.dirname(entry.dst);
+			const dstDir = Path.dirname(entry.dst);
 			if (entry.kind === EK_FILE) {
-				await exec(context, null, () => fs.mkdir(dstDir, { recursive: true }));
-				await exec(context, `would copy file ${entry.src} -> ${entry.dst}`, () => fs.copyFile(entry.src, entry.dst));
+				await exec(context, null, () => FS.mkdir(dstDir, { recursive: true }));
+				await exec(context, `would copy file ${entry.src} -> ${entry.dst}`, () => FS.copyFile(entry.src, entry.dst));
 				context.addWatchFile(entry.src);
 			}
 			else if (entry.kind === EK_LINK && symLinks !== SL_IGNORE) {
@@ -105,19 +105,19 @@ export default function CopyPlugin(pluginOptions) {
 					continue;
 				}
 
-				await exec(context, null, () => fs.mkdir(dstDir, { recursive: true }));
+				await exec(context, null, () => FS.mkdir(dstDir, { recursive: true }));
 				switch (symLinks) {
 					case SL_COPY_FILE:
-						await exec(context, `would copy file ${linkedPath} -> ${entry.dst} resolved from symlink ${entry.src}`, () => fs.copyFile(linkedPath, entry.dst));
+						await exec(context, `would copy file ${linkedPath} -> ${entry.dst} resolved from symlink ${entry.src}`, () => FS.copyFile(linkedPath, entry.dst));
 						break;
 
 					case SL_LINK_ABSOLUTE:
-						await exec(context, `would create symlink ${entry.dst} pointing to ${linkedPath} resolved from symlink ${entry.src}`, () => fs.symlink(linkedPath, entry.dst));
+						await exec(context, `would create symlink ${entry.dst} pointing to ${linkedPath} resolved from symlink ${entry.src}`, () => FS.symlink(linkedPath, entry.dst));
 						break;
 
 					case SL_LINK_RELATIVE: {
-						const linkTargetPath = path.relative(entry.dst, linkedPath);
-						await exec(context, `would create symlink ${entry.dst} pointing to ${linkTargetPath} resolved from symlink ${entry.src}`, () => fs.symlink(linkTargetPath, entry.dst));
+						const linkTargetPath = Path.relative(entry.dst, linkedPath);
+						await exec(context, `would create symlink ${entry.dst} pointing to ${linkTargetPath} resolved from symlink ${entry.src}`, () => FS.symlink(linkTargetPath, entry.dst));
 						break;
 					}
 				}
@@ -127,7 +127,6 @@ export default function CopyPlugin(pluginOptions) {
 		}
 	};
 
-	let cwd = undefined;
 	let isFirstBeforeRun = true;
 	let isFirstAfterRun = true;
 	return {
@@ -138,7 +137,8 @@ export default function CopyPlugin(pluginOptions) {
 			}
 
 			isFirstBeforeRun = false;
-			cwd = process.cwd();
+
+			const cwd = process.cwd();
 			for (const target of targets) {
 				if (target.trigger === "before") {
 					await execTarget(this, cwd, target);
@@ -151,6 +151,8 @@ export default function CopyPlugin(pluginOptions) {
 			}
 
 			isFirstAfterRun = false;
+
+			const cwd = process.cwd();
 			for (const target of targets) {
 				const { trigger } = target;
 				if (trigger === "after" || trigger === undefined) {
@@ -183,15 +185,15 @@ async function resolveSymLink(linkPath, maxDepth = 8) {
 	let current = linkPath;
 	let depth = 0;
 	do {
-		const st = await fs.stat(current);
+		const st = await FS.stat(current);
 		if (!st.isSymbolicLink()) {
 			return current;
 		}
 
-		const target = await fs.readlink(current, "utf8");
+		const target = await FS.readlink(current, "utf8");
 		visited.add(current);
 
-		current = path.join(path.dirname(current), target);
+		current = Path.join(Path.dirname(current), target);
 	}
 	while (!visited.has(current) && ++depth < maxDepth);
 
