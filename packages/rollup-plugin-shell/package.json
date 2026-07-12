@@ -1,0 +1,14 @@
+{
+	"name": "@calmdown/rollup-plugin-shell",
+	"version": "1.0.0",
+	"license": "ISC",
+	"type": "module",
+	"exports": {
+		".": {
+			"import": "./index.js"
+		}
+	},
+	"files": [
+		"index.js"
+	]
+}
