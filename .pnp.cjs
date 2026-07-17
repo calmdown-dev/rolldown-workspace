@@ -31,8 +31,16 @@ const RAW_RUNTIME_STATE =
       "reference": "workspace:packages/rollup-plugin-lightningcss"\
     },\
     {\
+      "name": "@calmdown/rollup-plugin-shell",\
+      "reference": "workspace:packages/rollup-plugin-shell"\
+    },\
+    {\
       "name": "@calmdown/rollup-plugin-text-loader",\
       "reference": "workspace:packages/rollup-plugin-text-loader"\
+    },\
+    {\
+      "name": "@calmdown/rollup-plugin-watch",\
+      "reference": "workspace:packages/rollup-plugin-watch"\
     }\
   ],\
   "enableTopLevelFallback": true,\
@@ -43,7 +51,9 @@ const RAW_RUNTIME_STATE =
     ["@calmdown/rollup-plugin-copy", ["workspace:packages/rollup-plugin-copy"]],\
     ["@calmdown/rollup-plugin-delete", ["workspace:packages/rollup-plugin-delete"]],\
     ["@calmdown/rollup-plugin-lightningcss", ["workspace:packages/rollup-plugin-lightningcss"]],\
+    ["@calmdown/rollup-plugin-shell", ["workspace:packages/rollup-plugin-shell"]],\
     ["@calmdown/rollup-plugin-text-loader", ["workspace:packages/rollup-plugin-text-loader"]],\
+    ["@calmdown/rollup-plugin-watch", ["workspace:packages/rollup-plugin-watch"]],\
     ["@calmdown/rollup-workspace-monorepo", ["workspace:."]]\
   ],\
   "fallbackPool": [\
@@ -100,11 +110,29 @@ const RAW_RUNTIME_STATE =
         "linkType": "SOFT"\
       }]\
     ]],\
+    ["@calmdown/rollup-plugin-shell", [\
+      ["workspace:packages/rollup-plugin-shell", {\
+        "packageLocation": "./packages/rollup-plugin-shell/",\
+        "packageDependencies": [\
+          ["@calmdown/rollup-plugin-shell", "workspace:packages/rollup-plugin-shell"]\
+        ],\
+        "linkType": "SOFT"\
+      }]\
+    ]],\
     ["@calmdown/rollup-plugin-text-loader", [\
       ["workspace:packages/rollup-plugin-text-loader", {\
         "packageLocation": "./packages/rollup-plugin-text-loader/",\
         "packageDependencies": [\
           ["@calmdown/rollup-plugin-text-loader", "workspace:packages/rollup-plugin-text-loader"]\
+        ],\
+        "linkType": "SOFT"\
+      }]\
+    ]],\
+    ["@calmdown/rollup-plugin-watch", [\
+      ["workspace:packages/rollup-plugin-watch", {\
+        "packageLocation": "./packages/rollup-plugin-watch/",\
+        "packageDependencies": [\
+          ["@calmdown/rollup-plugin-watch", "workspace:packages/rollup-plugin-watch"]\
         ],\
         "linkType": "SOFT"\
       }]\

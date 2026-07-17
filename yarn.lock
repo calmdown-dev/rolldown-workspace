@@ -40,9 +40,21 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@calmdown/rollup-plugin-shell@workspace:packages/rollup-plugin-shell":
+  version: 0.0.0-use.local
+  resolution: "@calmdown/rollup-plugin-shell@workspace:packages/rollup-plugin-shell"
+  languageName: unknown
+  linkType: soft
+
 "@calmdown/rollup-plugin-text-loader@workspace:packages/rollup-plugin-text-loader":
   version: 0.0.0-use.local
   resolution: "@calmdown/rollup-plugin-text-loader@workspace:packages/rollup-plugin-text-loader"
+  languageName: unknown
+  linkType: soft
+
+"@calmdown/rollup-plugin-watch@workspace:packages/rollup-plugin-watch":
+  version: 0.0.0-use.local
+  resolution: "@calmdown/rollup-plugin-watch@workspace:packages/rollup-plugin-watch"
   languageName: unknown
   linkType: soft
 
