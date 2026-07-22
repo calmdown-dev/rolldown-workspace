@@ -1,18 +1,22 @@
 # Rolldown Workspace
 
-Utility library marrying Rolldown with Yarn Workspaces with declarative and
-reusable config blocks inspired by Gradle.
+Utility library marrying Rolldown with workspaces using declarative, reusable
+config blocks inspired by Gradle.
+
+Supports NPM, Yarn Classic, Yarn Berry and PNPM workspaces.
 
 ## Getting Started
 
 First, create a `build-logic` workspace in your monorepo. This alone creates a
 powerful setup for sharing dependencies and build configs without the need to
-re-define anything twice. The general structure looks similar to this:
+re-define build dependencies. The general structure looks similar to this:
 
 ```txt
 my-monorepo
 ├─ build-logic
-│  ├─ build.js              the global build command
+│  ├─ bin
+│  │  └─ build.js           the global build command
+│  │
 │  ├─ package.json          defines Rolldown and plugin versions
 │  ├─ plugins.js            plugin imports and default configs
 │  └─ targets.js            common build targets used by individual packages
@@ -30,7 +34,7 @@ my-monorepo
 │  │
 │  └─ ...
 │
-└─ package.json             defines workspaces
+└─ package.json             defines workspaces (or pnpm-workspaces.yaml)
 ```
 
 The monorepo root `package.json` only needs to define workspaces and optionally
@@ -53,7 +57,7 @@ available throughout all workspaces.
 
 ### The build-logic Package
 
-The `build-logic` package will contain most of the meat. First, create the
+The `build-logic` package will contain most of the "meat." First, create the
 `package.json` file. It should define your plugins and targets exports, the
 global build command and dev dependencies on rolldown itself and all plugins
 you're using. E.g.:
@@ -71,12 +75,12 @@ you're using. E.g.:
     }
   },
   "bin": {
-    "build": "./build.js"
+    "build": "./bin/build.js"
   },
   "devDependencies": {
-    "@calmdown/rolldown-workspace": "1.0.0",
-    "rolldown": "1.0.0-rc.3",
-    "rolldown-plugin-dts": "0.22.1"
+    "@calmdown/rolldown-workspace": "1.0.0-rc.6",
+    "rolldown": "1.2.x",
+    "rolldown-plugin-dts": "0.27.x"
   }
 }
 ```
@@ -125,21 +129,21 @@ export const TypeScriptLibrary = defineTarget("TypeScriptLibrary", target => tar
 
 Finally add the build command script in `build.js`. The build function comes
 with sensible defaults out of the box, however it is recommended to set at least
-the `jail` directory to constrain all lookups to stay within the monorepo.
+the `jail` directory to constrain lookups within the monorepo.
 
 ```js
-import * as path from "node:path";
+import * as Path from "node:path";
 
 import { build } from "@calmdown/rolldown-workspace";
 
-const jail = path.join(import.meta.dirname, "../..");
+const jail = Path.join(import.meta.dirname, "../..");
 await build({ jail });
 ```
 
 ### Other Packages
 
-With this setup, any package that needs a Rolldown build can now do so simply by
-adding a dev dependency on `build-logic` and adding a `build.config.js` script:
+With this setup, any package that needs a Rolldown build simply declares a dev
+dependency on `build-logic` and provides a `build.config.js` script:
 
 ```json
 {
@@ -158,11 +162,14 @@ Target.JavaScriptLibrary.build(target => {
 
   // here you can override individual configurations, add or disable plugins, etc.
   // all without affecting other packages even if they use the same target
-  target.pipelines.Code.plugins.Terser.disable();
+  target.pipelines.Code.plugins.Declarations.disable();
 });
 ```
 
-Now when you navigate to the `./packages/package-1` directory and run
-`yarn build`, it will execute the configured Rolldown build. Additionally, if
+Now when you navigate to the `./packages/package-1` directory and run the
+`build` command, it will execute the configured Rolldown build. Additionally, if
 your package defines dependencies on other workspace packages, they will be
 built first as long as they define their own build configs.
+
+Running the `build` command in the monorepo root will run builds of all
+workspaces.

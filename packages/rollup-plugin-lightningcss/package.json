@@ -1,6 +1,6 @@
 {
 	"name": "@calmdown/rollup-plugin-lightningcss",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"license": "ISC",
 	"type": "module",
 	"exports": {
@@ -12,9 +12,9 @@
 		"index.js"
 	],
 	"peerDependencies": {
-		"lightningcss": ">=1.32.0"
+		"lightningcss": "catalog:"
 	},
 	"devDependencies": {
-		"lightningcss": "1.32.0"
+		"lightningcss": "catalog:"
 	}
 }

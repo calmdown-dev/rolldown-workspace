@@ -1,0 +1,21 @@
+linkWorkspacePackages: true
+preferWorkspacePackages: true
+packages:
+  - ./packages/*
+
+catalogMode: strict
+catalog:
+  "@types/node": 26.1.x
+  lightningcss: 1.32.x
+  rolldown: 1.2.x
+  rolldown-plugin-dts: 0.27.x
+  typescript: 6.0.x
+  yaml: 2.9.x
+
+trustPolicy: no-downgrade
+trustPolicyExclude:
+  - "@calmdown/*"
+
+minimumReleaseAge: 10080 # 2w
+minimumReleaseAgeExclude:
+  - "@calmdown/*"

@@ -148,6 +148,10 @@ export default function LightningCssPlugin(pluginOptions) {
 							};
 						});
 
+					if (chunks.length === 0) {
+						return;
+					}
+
 					// merge CSS code
 					let code = chunks.map(chunk => chunk.transformedCode).join("\n");
 

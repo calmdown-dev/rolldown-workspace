@@ -1,6 +1,8 @@
-import * as path from "node:path";
+import * as Path from "node:path";
 
 import { defaultFileSystem, type FileSystem } from "~/FileSystem";
+
+import { isENOENT, isObject, isString } from "./common";
 
 export interface PackageDeclaration {
 	[key: string]: unknown;
@@ -61,10 +63,10 @@ export class Package {
 
 		try {
 			// walk up to find the nearest package.json file
-			const jail = options?.jail ? path.resolve(options?.jail) : "";
+			const jail = options?.jail ? Path.resolve(options?.jail) : "";
 			let declPath!: string;
 			let declJson: string | undefined;
-			let cwd = options?.cwd ? path.resolve(options.cwd) : process.cwd();
+			let cwd = options?.cwd ? Path.resolve(options.cwd) : process.cwd();
 			let depth = 0;
 
 			while (cwd.startsWith(jail) && ++depth < 128) {
@@ -77,7 +79,7 @@ export class Package {
 				// attempt to load package.json
 				try {
 					visitedDirs.push(cwd);
-					declPath = path.join(cwd, "./package.json");
+					declPath = Path.join(cwd, "./package.json");
 					declJson = await fs.readFile(declPath, "utf8");
 					break;
 				}
@@ -88,7 +90,7 @@ export class Package {
 					}
 				}
 
-				const parentDir = path.join(cwd, "..");
+				const parentDir = Path.join(cwd, "..");
 				if (parentDir === cwd) {
 					break;
 				}
@@ -117,10 +119,6 @@ export class Package {
 				throw new Error(`name must be a string in: ${declPath}`);
 			}
 
-			if (declaration.workspaces !== undefined && !isArrayOf(declaration.workspaces, isString)) {
-				throw new Error(`workspaces must be an array of strings in: ${declPath}`);
-			}
-
 			// look for build config
 			const buildConfigGlob = options?.buildConfigGlob ?? "build.config.{js,mjs}";
 			const iterator = fs.glob(buildConfigGlob, { cwd });
@@ -131,7 +129,7 @@ export class Package {
 						throw new Error(`multiple build config files found in: ${cwd}`);
 					}
 
-					buildConfigPath = path.join(cwd, hint);
+					buildConfigPath = Path.join(cwd, hint);
 				}
 			}
 			finally {
@@ -149,24 +147,4 @@ export class Package {
 			});
 		}
 	}
-}
-
-interface NodeError extends Error {
-	readonly code?: string;
-}
-
-function isENOENT(ex: unknown): ex is NodeError {
-	return (ex as NodeError | null)?.code === "ENOENT";
-}
-
-function isObject(value: unknown): value is Record<PropertyKey, unknown> {
-	return value !== null && typeof value === "object";
-}
-
-function isString(value: unknown): value is string {
-	return typeof value === "string";
-}
-
-function isArrayOf<T>(value: unknown, guard: (item: unknown) => item is T): value is T[] {
-	return Array.isArray(value) && (value.length === 0 || guard(value[0]));
 }
