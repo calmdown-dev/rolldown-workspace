@@ -7,22 +7,22 @@ settings:
 catalogs:
   default:
     '@types/node':
-      specifier: 26.1.x
+      specifier: 26.1.1
       version: 26.1.1
     lightningcss:
-      specifier: 1.32.x
+      specifier: 1.32.0
       version: 1.32.0
     rolldown:
-      specifier: 1.2.x
+      specifier: 1.2.0
       version: 1.2.0
     rolldown-plugin-dts:
-      specifier: 0.27.x
+      specifier: 0.27.9
       version: 0.27.9
     typescript:
-      specifier: 6.0.x
+      specifier: 6.0.3
       version: 6.0.3
     yaml:
-      specifier: 2.9.x
+      specifier: 2.9.0
       version: 2.9.0
 
 importers:
