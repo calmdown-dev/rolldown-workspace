@@ -30,7 +30,7 @@ importers:
   .:
     devDependencies:
       typescript:
-        specifier: 6.0.3
+        specifier: 'catalog:'
         version: 6.0.3
 
   packages/rolldown-workspace:
